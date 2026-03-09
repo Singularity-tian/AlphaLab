@@ -347,3 +347,137 @@ class DataProvider:
         except Exception as e:
             logger.warning("Failed to fetch transcript dates for %s: %s", ticker, e)
             return []
+
+    # ------------------------------------------------------------------
+    # Company profile & segmentation (FMP stable API)
+    # ------------------------------------------------------------------
+
+    def get_company_profile(self, ticker: str) -> dict | None:
+        """Fetch company profile (description, sector, industry, etc.)."""
+        cache_key = f"profile_{ticker}"
+        cached = self.cache.get_json(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            rows = self._fmp_get("profile", {"symbol": ticker})
+            if not rows:
+                return None
+
+            row = rows[0]
+            profile = {
+                "company_name": row.get("companyName", ticker),
+                "description": row.get("description", ""),
+                "sector": row.get("sector", ""),
+                "industry": row.get("industry", ""),
+                "mkt_cap": row.get("mktCap"),
+                "full_time_employees": row.get("fullTimeEmployees"),
+                "country": row.get("country", ""),
+            }
+            self.cache.set_json(cache_key, profile)
+            return profile
+        except Exception as e:
+            logger.warning("Failed to fetch profile for %s: %s", ticker, e)
+            return None
+
+    def get_revenue_segmentation(self, ticker: str) -> dict | None:
+        """Fetch revenue breakdown by product and geography.
+
+        Returns dict with 'by_product' and 'by_geography' percentage dicts,
+        or None if unavailable.
+        """
+        cache_key = f"revenue_seg_{ticker}"
+        cached = self.cache.get_json(cache_key)
+        if cached is not None:
+            return cached
+
+        result: dict = {}
+
+        try:
+            # Product segmentation
+            prod_data = self._fmp_get(
+                "revenue-product-segmentation",
+                {"symbol": ticker, "period": "annual"},
+            )
+            if prod_data:
+                # Most recent year first; each item is {date: ..., segment_name: value}
+                latest = prod_data[0]
+                # Extract segment dict (all keys except non-segment metadata)
+                segments = {}
+                for item in prod_data:
+                    if isinstance(item, dict):
+                        for k, v in item.items():
+                            if isinstance(v, dict):
+                                segments = v
+                                break
+                        if segments:
+                            break
+
+                if segments:
+                    total = sum(abs(v) for v in segments.values() if isinstance(v, (int, float)))
+                    if total > 0:
+                        result["by_product"] = {
+                            k: round(abs(v) / total * 100, 1)
+                            for k, v in segments.items()
+                            if isinstance(v, (int, float))
+                        }
+        except Exception as e:
+            logger.warning("Failed to fetch product segmentation for %s: %s", ticker, e)
+
+        try:
+            # Geographic segmentation
+            geo_data = self._fmp_get(
+                "revenue-geographic-segments",
+                {"symbol": ticker, "period": "annual"},
+            )
+            if geo_data:
+                segments = {}
+                for item in geo_data:
+                    if isinstance(item, dict):
+                        for k, v in item.items():
+                            if isinstance(v, dict):
+                                segments = v
+                                break
+                        if segments:
+                            break
+
+                if segments:
+                    total = sum(abs(v) for v in segments.values() if isinstance(v, (int, float)))
+                    if total > 0:
+                        result["by_geography"] = {
+                            k: round(abs(v) / total * 100, 1)
+                            for k, v in segments.items()
+                            if isinstance(v, (int, float))
+                        }
+        except Exception as e:
+            logger.warning("Failed to fetch geo segmentation for %s: %s", ticker, e)
+
+        if not result:
+            return None
+
+        self.cache.set_json(cache_key, result)
+        return result
+
+    def get_employee_count(self, ticker: str) -> int | None:
+        """Fetch latest employee count."""
+        cache_key = f"employees_{ticker}"
+        cached = self.cache.get_json(cache_key)
+        if cached is not None:
+            return cached.get("count")
+
+        try:
+            data = self._fmp_get("employee-count", {"symbol": ticker})
+            if data:
+                count = data[0].get("employeeCount")
+                if count is not None:
+                    self.cache.set_json(cache_key, {"count": count})
+                    return count
+        except Exception as e:
+            logger.warning("Failed to fetch employee count for %s: %s", ticker, e)
+
+        # Fallback: try from profile
+        profile = self.get_company_profile(ticker)
+        if profile and profile.get("full_time_employees"):
+            return profile["full_time_employees"]
+
+        return None

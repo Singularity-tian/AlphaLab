@@ -45,15 +45,16 @@ class LLMClient:
         prompt: str,
         system: str = "",
         provider: str | None = None,
+        model: str | None = None,
     ) -> str:
         provider = provider or self.config.primary_provider
 
         for attempt in range(self.config.max_retries):
             try:
                 if provider == "gemini":
-                    return self._generate_gemini(prompt, system)
+                    return self._generate_gemini(prompt, system, model)
                 elif provider == "claude":
-                    return self._generate_claude(prompt, system)
+                    return self._generate_claude(prompt, system, model)
                 else:
                     raise ValueError(f"Unknown provider: {provider}")
             except Exception as e:
@@ -63,8 +64,8 @@ class LLMClient:
                     logger.info("Falling back to %s", fallback)
                     try:
                         if fallback == "gemini":
-                            return self._generate_gemini(prompt, system)
-                        return self._generate_claude(prompt, system)
+                            return self._generate_gemini(prompt, system, model)
+                        return self._generate_claude(prompt, system, model)
                     except Exception as fb_err:
                         raise RuntimeError(
                             f"Both providers failed. "
@@ -79,31 +80,36 @@ class LLMClient:
         response_model: Type[T],
         system: str = "",
         provider: str | None = None,
+        model: str | None = None,
     ) -> T:
         schema_hint = (
             "\nRespond with valid JSON matching this schema:\n"
             f"{json.dumps(response_model.model_json_schema(), indent=2)}\n"
         )
-        raw = self.generate(prompt + schema_hint, system, provider)
+        raw = self.generate(prompt + schema_hint, system, provider, model)
         json_str = self._extract_json(raw)
         return response_model.model_validate_json(json_str)
 
-    def _generate_gemini(self, prompt: str, system: str) -> str:
+    def _generate_gemini(
+        self, prompt: str, system: str, model: str | None = None
+    ) -> str:
         client = self._get_gemini_client()
         config: dict = {"temperature": self.config.temperature}
         if system:
             config["system_instruction"] = system
         response = client.models.generate_content(
-            model=self.config.gemini_model,
+            model=model or self.config.gemini_model,
             contents=prompt,
             config=config,
         )
         return response.text
 
-    def _generate_claude(self, prompt: str, system: str) -> str:
+    def _generate_claude(
+        self, prompt: str, system: str, model: str | None = None
+    ) -> str:
         client = self._get_anthropic_client()
         kwargs: dict = {
-            "model": self.config.anthropic_model,
+            "model": model or self.config.anthropic_model,
             "max_tokens": 4096,
             "messages": [{"role": "user", "content": prompt}],
         }
