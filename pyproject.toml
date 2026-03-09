@@ -8,11 +8,11 @@ version = "0.1.0"
 description = "LLM-powered factor investing with leak-proof backtesting"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.11,<3.15"
 dependencies = [
     "pandas>=2.0",
     "numpy>=1.24",
-    "financetoolkit>=1.9",
+    "yfinance>=0.2.36",
     "Backtesting>=0.3.3",
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
