@@ -56,6 +56,8 @@ def generate_html_report(
                 "side": t["side"], "shares": int(t["shares"]),
                 "price": round(t["price"], 2), "value": round(t["value"], 2),
                 "commission": round(t["commission"], 2),
+                "cash_impact": round(t["cash_impact"], 2),
+                "cash_after": round(t["cash_after"], 2),
             })
 
     stock_table = []
@@ -265,6 +267,7 @@ footer{{margin-top:64px;padding-top:24px;border-top:1px solid var(--bd);text-ali
       <th data-s="date">Date</th><th data-s="ticker">Ticker</th><th data-s="side">Side</th>
       <th data-s="shares">Shares</th><th data-s="price">Price</th>
       <th data-s="value">Value</th><th data-s="commission">Comm.</th>
+      <th data-s="cash_impact">+/-</th><th data-s="cash_after">Cash</th>
     </tr></thead><tbody></tbody></table></div>
   </div>
 </div>
@@ -338,7 +341,7 @@ const pb=D.pv.map(v=>v>=0?'#22c55e':'#ef4444');
 new Chart(document.getElementById('pnlC'),{{type:'bar',data:{{labels:D.pt,datasets:[{{data:D.pv,backgroundColor:pc,borderColor:pb,borderWidth:1,borderRadius:2}}]}},options:{{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{{legend:{{display:false}},tooltip:{{callbacks:{{label:c=>'$'+c.parsed.x.toLocaleString()}}}}}},scales:{{x:{{grid:G,ticks:{{callback:v=>'$'+(v/1000).toFixed(0)+'k'}}}},y:{{grid:{{display:false}},ticks:{{font:{{size:9}}}}}}}}}}}});
 
 function rS(d){{const b=document.querySelector('#sT tbody');b.innerHTML=d.map(r=>`<tr><td class="tk">${{r.ticker}}</td><td class="${{r.pnl>=0?'pos':'neg'}}">${{r.pnl>=0?'+':''}}$${{r.pnl.toLocaleString(undefined,{{minimumFractionDigits:2}})}}</td><td>$${{r.total_cost.toLocaleString(undefined,{{minimumFractionDigits:2}})}}</td><td>$${{r.total_proceeds.toLocaleString(undefined,{{minimumFractionDigits:2}})}}</td><td>${{r.unrealized>0?'$'+r.unrealized.toLocaleString(undefined,{{minimumFractionDigits:2}}):'—'}}</td><td>${{r.open>0?r.open:'—'}}</td><td>${{r.buys}}</td><td>${{r.sells}}</td></tr>`).join('');document.getElementById('sN').textContent=d.length+' stocks'}}
-function rT(d){{const b=document.querySelector('#tT tbody');b.innerHTML=d.map(r=>`<tr><td>${{r.date}}</td><td class="tk">${{r.ticker}}</td><td class="${{r.side==='BUY'?'buy':'sell'}}">${{r.side}}</td><td>${{r.shares.toLocaleString()}}</td><td>$${{r.price.toFixed(2)}}</td><td>$${{r.value.toLocaleString(undefined,{{minimumFractionDigits:2}})}}</td><td>$${{r.commission.toFixed(2)}}</td></tr>`).join('');document.getElementById('tN').textContent=d.length+' trades'}}
+function rT(d){{const b=document.querySelector('#tT tbody');b.innerHTML=d.map(r=>`<tr><td>${{r.date}}</td><td class="tk">${{r.ticker}}</td><td class="${{r.side==='BUY'?'buy':'sell'}}">${{r.side}}</td><td>${{r.shares.toLocaleString()}}</td><td>$${{r.price.toFixed(2)}}</td><td>$${{r.value.toLocaleString(undefined,{{minimumFractionDigits:2}})}}</td><td>$${{r.commission.toFixed(2)}}</td><td class="${{r.cash_impact>=0?'pos':'neg'}}">${{r.cash_impact>=0?'+':''}}$${{r.cash_impact.toLocaleString(undefined,{{minimumFractionDigits:2}})}}</td><td>$${{r.cash_after.toLocaleString(undefined,{{minimumFractionDigits:2}})}}</td></tr>`).join('');document.getElementById('tN').textContent=d.length+' trades'}}
 rS(D.st);rT(D.td);
 document.getElementById('sF').addEventListener('input',e=>{{const q=e.target.value.toUpperCase();rS(D.st.filter(r=>r.ticker.includes(q)))}});
 document.getElementById('tF').addEventListener('input',e=>{{const q=e.target.value.toUpperCase();rT(D.td.filter(r=>r.ticker.includes(q)||r.date.includes(q)))}});

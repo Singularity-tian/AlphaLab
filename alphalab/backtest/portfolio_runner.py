@@ -224,6 +224,8 @@ class PortfolioBacktestRunner:
                         "price": price,
                         "value": proceeds,
                         "commission": commission,
+                        "cash_impact": proceeds - commission,
+                        "cash_after": cash,
                     }
                 )
 
@@ -266,6 +268,8 @@ class PortfolioBacktestRunner:
                     "price": price,
                     "value": proceeds,
                     "commission": commission,
+                    "cash_impact": proceeds - commission,
+                    "cash_after": cash,
                 }
             )
 
@@ -310,6 +314,8 @@ class PortfolioBacktestRunner:
                         "price": price,
                         "value": cost,
                         "commission": commission,
+                        "cash_impact": -(cost + commission),
+                        "cash_after": cash,
                     }
                 )
 
