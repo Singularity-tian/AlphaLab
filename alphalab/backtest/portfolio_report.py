@@ -58,6 +58,7 @@ def generate_html_report(
                 "commission": round(t["commission"], 2),
                 "cash_impact": round(t["cash_impact"], 2),
                 "cash_after": round(t["cash_after"], 2),
+                "reason": t.get("reason", ""),
             })
 
     stock_table = []
@@ -84,15 +85,6 @@ def generate_html_report(
     return str(output_path)
 
 
-def _kpi_class(val):
-    if isinstance(val, (int, float)):
-        if val > 0:
-            return "positive"
-        if val < 0:
-            return "negative"
-    return ""
-
-
 def _build_html(
     stats, config_summary,
     eq_dates, eq_vals, dd,
@@ -110,6 +102,14 @@ def _build_html(
     ret_cls = "pos" if stats["Total Return [%]"] >= 0 else "neg"
     ann_cls = "pos" if stats["Annualized Return [%]"] >= 0 else "neg"
 
+    stop_loss_exits = stats.get("Stop-Loss Exits", 0)
+    expired_exits = stats.get("Holding Expired Exits", 0)
+    avg_positions = stats.get("Avg Positions", 0)
+    trailing_stop_pct = config_summary.get("trailing_stop_pct", "20%")
+    holding_days = config_summary.get("holding_period_days", "252")
+    max_pos = config_summary.get("max_positions", "15")
+    max_wt = config_summary.get("max_position_weight", "25%")
+
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -124,16 +124,14 @@ def _build_html(
   --bd:#27272a;--bds:#1c1c1f;
   --t:#fafafa;--td:#a1a1aa;--tm:#71717a;
   --ac:#c8f542;--acd:#a5cc30;
-  --red:#ef4444;--grn:#22c55e;--blu:#3b82f6;
+  --red:#ef4444;--grn:#22c55e;--blu:#3b82f6;--org:#f59e0b;
 }}
 body{{background:var(--bg);color:var(--t);font-family:'DM Mono',monospace;font-size:13px;line-height:1.6;-webkit-font-smoothing:antialiased}}
 .wrap{{max-width:1320px;margin:0 auto;padding:40px 32px 80px}}
 
-/* noise overlay */
 .noise{{position:fixed;inset:0;pointer-events:none;z-index:9999;opacity:.03;
   background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}}
 
-/* header */
 header{{padding:48px 0 40px;border-bottom:1px solid var(--bd);margin-bottom:48px;position:relative}}
 header::before{{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--ac),transparent)}}
 .htop{{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:16px}}
@@ -143,19 +141,16 @@ header::before{{content:'';position:absolute;top:0;left:0;right:0;height:1px;bac
 .pill{{background:var(--s2);border:1px solid var(--bd);padding:5px 12px;border-radius:4px;font-size:11px;color:var(--td);white-space:nowrap}}
 .pill b{{color:var(--t);font-weight:500}}
 
-/* kpi */
-.kpis{{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--bds);border:1px solid var(--bd);border-radius:8px;overflow:hidden;margin-bottom:48px}}
+.kpis{{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--bds);border:1px solid var(--bd);border-radius:8px;overflow:hidden;margin-bottom:48px}}
 .kpi{{background:var(--s1);padding:20px 24px}}
 .kpi-l{{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--tm);margin-bottom:8px}}
-.kpi-v{{font-size:24px;font-weight:500;letter-spacing:-.5px}}
-.pos{{color:var(--grn)}}.neg{{color:var(--red)}}.acc{{color:var(--ac)}}
+.kpi-v{{font-size:22px;font-weight:500;letter-spacing:-.5px}}
+.pos{{color:var(--grn)}}.neg{{color:var(--red)}}.acc{{color:var(--ac)}}.org{{color:var(--org)}}
 
-/* sections */
 .sec{{margin-bottom:48px}}
 .sec-t{{font-family:'Instrument Serif',serif;font-size:24px;font-weight:400;margin-bottom:24px;padding-bottom:12px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:12px}}
 .dot{{width:6px;height:6px;background:var(--ac);border-radius:50%;flex-shrink:0}}
 
-/* charts */
 .cc{{background:var(--s1);border:1px solid var(--bd);border-radius:8px;padding:24px;margin-bottom:16px;position:relative;overflow:hidden}}
 .cc::after{{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--acd),transparent);opacity:.3}}
 .cl{{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--tm);margin-bottom:16px}}
@@ -163,7 +158,6 @@ canvas{{width:100%!important;height:280px!important}}
 .crow{{display:grid;grid-template-columns:1fr 1fr;gap:16px}}
 @media(max-width:900px){{.crow{{grid-template-columns:1fr}}}}
 
-/* tables */
 .tw{{background:var(--s1);border:1px solid var(--bd);border-radius:8px;overflow:hidden}}
 .tc{{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--bd)}}
 .tc input{{background:var(--s2);border:1px solid var(--bd);color:var(--t);padding:6px 12px;border-radius:4px;font-family:'DM Mono',monospace;font-size:12px;outline:none;width:200px}}
@@ -177,12 +171,14 @@ tr:hover td{{background:var(--s2);color:var(--t)}}
 td.tk{{font-weight:500;color:var(--t)}}
 td.pos{{color:var(--grn)}}td.neg{{color:var(--red)}}
 td.buy{{color:var(--grn)}}td.sell{{color:var(--red)}}
+td.reason-sl{{color:var(--red);font-weight:500}}
+td.reason-exp{{color:var(--org)}}
+td.reason-si{{color:var(--blu)}}
 .tscr{{max-height:520px;overflow-y:auto}}
 .tscr::-webkit-scrollbar{{width:6px}}
 .tscr::-webkit-scrollbar-track{{background:var(--s1)}}
 .tscr::-webkit-scrollbar-thumb{{background:var(--bd);border-radius:3px}}
 
-/* strategy */
 .sgrid{{display:grid;grid-template-columns:1fr 1fr;gap:16px}}
 @media(max-width:900px){{.sgrid{{grid-template-columns:1fr}}}}
 .scard{{background:var(--s1);border:1px solid var(--bd);border-radius:8px;padding:24px}}
@@ -202,7 +198,8 @@ footer{{margin-top:64px;padding-top:24px;border-top:1px solid var(--bd);text-ali
 .kpi:nth-child(2){{animation-delay:.05s}}.kpi:nth-child(3){{animation-delay:.1s}}
 .kpi:nth-child(4){{animation-delay:.15s}}.kpi:nth-child(5){{animation-delay:.2s}}
 .kpi:nth-child(6){{animation-delay:.25s}}.kpi:nth-child(7){{animation-delay:.3s}}
-.kpi:nth-child(8){{animation-delay:.35s}}
+.kpi:nth-child(8){{animation-delay:.35s}}.kpi:nth-child(9){{animation-delay:.4s}}
+.kpi:nth-child(10){{animation-delay:.45s}}.kpi:nth-child(11){{animation-delay:.5s}}
 </style>
 </head>
 <body>
@@ -216,7 +213,9 @@ footer{{margin-top:64px;padding-top:24px;border-top:1px solid var(--bd);text-ali
       <div class="pill"><b>${config_summary.get('initial_cash','100,000')}</b> capital</div>
       <div class="pill"><b>{config_summary.get('period','2019–2024')}</b></div>
       <div class="pill"><b>{config_summary.get('universe','100')}</b> stocks</div>
-      <div class="pill"><b>{config_summary.get('rebalance','Monthly')}</b> rebalance</div>
+      <div class="pill"><b>Daily</b> signal check</div>
+      <div class="pill"><b>{trailing_stop_pct}</b> stop-loss</div>
+      <div class="pill"><b>{holding_days}d</b> holding period</div>
     </div>
   </div>
 </header>
@@ -230,6 +229,9 @@ footer{{margin-top:64px;padding-top:24px;border-top:1px solid var(--bd);text-ali
   <div class="kpi"><div class="kpi-l">Final Equity</div><div class="kpi-v acc">${stats['Equity Final [$]']:,.2f}</div></div>
   <div class="kpi"><div class="kpi-l">Total Trades</div><div class="kpi-v">{stats['# Trades']}</div></div>
   <div class="kpi"><div class="kpi-l">Commissions</div><div class="kpi-v">${stats['Total Commission [$]']:,.2f}</div></div>
+  <div class="kpi"><div class="kpi-l">Avg Positions</div><div class="kpi-v">{avg_positions}</div></div>
+  <div class="kpi"><div class="kpi-l">Stop-Loss Exits</div><div class="kpi-v org">{stop_loss_exits}</div></div>
+  <div class="kpi"><div class="kpi-l">Holding Expired</div><div class="kpi-v">{expired_exits}</div></div>
 </div>
 
 <div class="sec">
@@ -262,10 +264,10 @@ footer{{margin-top:64px;padding-top:24px;border-top:1px solid var(--bd);text-ali
 <div class="sec">
   <div class="sec-t"><span class="dot"></span>Trade Log</div>
   <div class="tw">
-    <div class="tc"><input type="text" id="tF" placeholder="Filter ticker or date..."><span class="cnt" id="tN">{len(trades_data)} trades</span></div>
+    <div class="tc"><input type="text" id="tF" placeholder="Filter ticker, date, or reason..."><span class="cnt" id="tN">{len(trades_data)} trades</span></div>
     <div class="tscr"><table id="tT"><thead><tr>
       <th data-s="date">Date</th><th data-s="ticker">Ticker</th><th data-s="side">Side</th>
-      <th data-s="shares">Shares</th><th data-s="price">Price</th>
+      <th data-s="reason">Reason</th><th data-s="shares">Shares</th><th data-s="price">Price</th>
       <th data-s="value">Value</th><th data-s="commission">Comm.</th>
       <th data-s="cash_impact">+/-</th><th data-s="cash_after">Cash</th>
     </tr></thead><tbody></tbody></table></div>
@@ -286,39 +288,39 @@ footer{{margin-top:64px;padding-top:24px;border-top:1px solid var(--bd);text-ali
         <li><b>Dividend Yield</b> — DY &gt; 3% signals cheap stock. Higher is better</li>
       </ul>
       <p style="margin-top:12px">Formula: <code>score = 0.4 x sigmoid(raw, threshold) + 0.6 x percentile_rank</code></p>
-      <p>Sigmoid anchors to Graham absolutes; percentile adapts to stock's own expanding-window history (no look-ahead).</p>
     </div>
-    <div class="scard"><h3><span class="n">2</span>Signal Combination</h3>
-      <p>5 factor scores combined via <b>equal-weight average</b> (re-weighted if any factor is NaN).</p>
-      <p>Combined score [0,1] converted to trading signal:</p>
+    <div class="scard"><h3><span class="n">2</span>Signal-Weighted Sizing</h3>
+      <p>5 factor scores combined via <b>equal-weight average</b> → combined score [0,1].</p>
+      <p>Combined score &gt; <code>0.6</code> → buy signal with strength = <code>(score - 0.6) / 0.4</code></p>
+      <p style="margin-top:12px"><b>Position weight</b> proportional to signal strength:</p>
       <ul>
-        <li>Score &gt; <code>0.6</code> (long threshold) → <b>Long signal</b>, strength = (score - 0.6) / 0.4</li>
-        <li>Score &lt; <code>0.4</code> (short threshold) → Short signal (unused, long-only)</li>
-        <li>Score in [0.4, 0.6] → <b>Flat</b> (no position)</li>
+        <li>Score 0.6 → minimal weight (0.05 floor)</li>
+        <li>Score 0.8 → medium weight</li>
+        <li>Score 1.0 → maximum weight</li>
       </ul>
-      <p style="margin-top:12px">Signals only update on <b>month-start dates</b>, forward-filled until next month. Prevents overtrading.</p>
+      <p style="margin-top:12px">Max <code>{max_wt}</code> per stock, max <code>{max_pos}</code> positions. 5% cash reserve.</p>
     </div>
-    <div class="scard"><h3><span class="n">3</span>Portfolio Rebalancing</h3>
-      <p>On each month-start:</p>
+    <div class="scard"><h3><span class="n">3</span>Entry Rules</h3>
+      <p>Signal checked <b>every trading day</b> (not monthly):</p>
       <ul>
-        <li><b>Identify targets</b>: all stocks with positive signal (combined &gt; 0.6)</li>
-        <li><b>Sell first</b>: liquidate positions no longer in target set</li>
-        <li><b>Compute allocation</b>: equal weight (1/N) among targets, based on post-sell portfolio value</li>
-        <li><b>Buy proportionally</b>: if cash is tight, all buys scale down equally (no ordering bias)</li>
-        <li><b>Commission</b>: {config_summary.get('commission','0.1%')} on each trade</li>
+        <li>New stock crosses combined &gt; 0.6 → buy that day</li>
+        <li><b>Scale-in</b>: buy 50% of target on Day 1</li>
+        <li>If signal still &gt; 0.6 after 5 days → buy remaining 50%</li>
+        <li>If signal drops before scale-in → stay at 50%, mark scaled-in</li>
+        <li>Stocks ranked by signal strength; top candidates get priority</li>
       </ul>
-      <p style="margin-top:12px">Between rebalances, positions held — only mark-to-market updates portfolio value.</p>
+      <p style="margin-top:12px">Commission: <code>{config_summary.get('commission','0.1%')}</code> per trade.</p>
     </div>
-    <div class="scard"><h3><span class="n">4</span>Exit Rules &amp; Risk</h3>
-      <p>Exits are <b>signal-driven only</b>:</p>
+    <div class="scard"><h3><span class="n">4</span>Exit Rules</h3>
+      <p>Two exit triggers, checked <b>daily</b>:</p>
       <ul>
-        <li>Sold when combined score drops below 0.6 at next month-start</li>
-        <li><b>No stop-loss</b> — held regardless of price drop until next rebalance</li>
-        <li><b>No take-profit</b> — gains not locked in early</li>
-        <li><b>No max-drawdown protection</b> — portfolio can draw down freely</li>
-        <li>Position sizing: equal weight, <b>no max position limit</b></li>
+        <li><b>Fixed holding period</b>: auto-sell after <code>{holding_days}</code> trading days (~1 year)</li>
+        <li><b>Trailing stop-loss</b>: sell if price drops <code>{trailing_stop_pct}</code> from peak since entry</li>
+        <li><b>No cooldown</b>: after stop-loss, can re-buy immediately if signal still good</li>
+        <li>Re-buy resets holding period and trailing high to new entry price</li>
+        <li>On expiry: if signal still &gt; 0.6, can re-enter same day (续仓)</li>
       </ul>
-      <p style="margin-top:12px"><b>Key risk</b>: with avg ~3 positions, portfolio is highly concentrated and volatile.</p>
+      <p style="margin-top:12px"><b>No signal-based exit</b>: if signal drops below 0.6 mid-holding, position is kept until expiry or stop-loss.</p>
     </div>
   </div>
 </div>
@@ -341,10 +343,11 @@ const pb=D.pv.map(v=>v>=0?'#22c55e':'#ef4444');
 new Chart(document.getElementById('pnlC'),{{type:'bar',data:{{labels:D.pt,datasets:[{{data:D.pv,backgroundColor:pc,borderColor:pb,borderWidth:1,borderRadius:2}}]}},options:{{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{{legend:{{display:false}},tooltip:{{callbacks:{{label:c=>'$'+c.parsed.x.toLocaleString()}}}}}},scales:{{x:{{grid:G,ticks:{{callback:v=>'$'+(v/1000).toFixed(0)+'k'}}}},y:{{grid:{{display:false}},ticks:{{font:{{size:9}}}}}}}}}}}});
 
 function rS(d){{const b=document.querySelector('#sT tbody');b.innerHTML=d.map(r=>`<tr><td class="tk">${{r.ticker}}</td><td class="${{r.pnl>=0?'pos':'neg'}}">${{r.pnl>=0?'+':''}}$${{r.pnl.toLocaleString(undefined,{{minimumFractionDigits:2}})}}</td><td>$${{r.total_cost.toLocaleString(undefined,{{minimumFractionDigits:2}})}}</td><td>$${{r.total_proceeds.toLocaleString(undefined,{{minimumFractionDigits:2}})}}</td><td>${{r.unrealized>0?'$'+r.unrealized.toLocaleString(undefined,{{minimumFractionDigits:2}}):'—'}}</td><td>${{r.open>0?r.open:'—'}}</td><td>${{r.buys}}</td><td>${{r.sells}}</td></tr>`).join('');document.getElementById('sN').textContent=d.length+' stocks'}}
-function rT(d){{const b=document.querySelector('#tT tbody');b.innerHTML=d.map(r=>`<tr><td>${{r.date}}</td><td class="tk">${{r.ticker}}</td><td class="${{r.side==='BUY'?'buy':'sell'}}">${{r.side}}</td><td>${{r.shares.toLocaleString()}}</td><td>$${{r.price.toFixed(2)}}</td><td>$${{r.value.toLocaleString(undefined,{{minimumFractionDigits:2}})}}</td><td>$${{r.commission.toFixed(2)}}</td><td class="${{r.cash_impact>=0?'pos':'neg'}}">${{r.cash_impact>=0?'+':''}}$${{r.cash_impact.toLocaleString(undefined,{{minimumFractionDigits:2}})}}</td><td>$${{r.cash_after.toLocaleString(undefined,{{minimumFractionDigits:2}})}}</td></tr>`).join('');document.getElementById('tN').textContent=d.length+' trades'}}
+function rc(reason){{if(reason==='STOP_LOSS')return'reason-sl';if(reason==='EXPIRED')return'reason-exp';if(reason==='SCALE_IN')return'reason-si';return''}}
+function rT(d){{const b=document.querySelector('#tT tbody');b.innerHTML=d.map(r=>`<tr><td>${{r.date}}</td><td class="tk">${{r.ticker}}</td><td class="${{r.side==='BUY'?'buy':'sell'}}">${{r.side}}</td><td class="${{rc(r.reason)}}">${{r.reason}}</td><td>${{r.shares.toLocaleString()}}</td><td>$${{r.price.toFixed(2)}}</td><td>$${{r.value.toLocaleString(undefined,{{minimumFractionDigits:2}})}}</td><td>$${{r.commission.toFixed(2)}}</td><td class="${{r.cash_impact>=0?'pos':'neg'}}">${{r.cash_impact>=0?'+':''}}$${{r.cash_impact.toLocaleString(undefined,{{minimumFractionDigits:2}})}}</td><td>$${{r.cash_after.toLocaleString(undefined,{{minimumFractionDigits:2}})}}</td></tr>`).join('');document.getElementById('tN').textContent=d.length+' trades'}}
 rS(D.st);rT(D.td);
 document.getElementById('sF').addEventListener('input',e=>{{const q=e.target.value.toUpperCase();rS(D.st.filter(r=>r.ticker.includes(q)))}});
-document.getElementById('tF').addEventListener('input',e=>{{const q=e.target.value.toUpperCase();rT(D.td.filter(r=>r.ticker.includes(q)||r.date.includes(q)))}});
+document.getElementById('tF').addEventListener('input',e=>{{const q=e.target.value.toUpperCase();rT(D.td.filter(r=>r.ticker.includes(q)||r.date.includes(q)||r.reason.includes(q)))}});
 document.querySelectorAll('th[data-s]').forEach(th=>{{let a=true;th.addEventListener('click',()=>{{const k=th.dataset.s;const isS=th.closest('table').id==='sT';const d=isS?[...D.st]:[...D.td];d.sort((x,y)=>{{const va=x[k],vb=y[k];if(typeof va==='string')return a?va.localeCompare(vb):vb.localeCompare(va);return a?va-vb:vb-va}});th.closest('thead').querySelectorAll('th').forEach(t=>t.classList.remove('sorted'));th.classList.add('sorted');a=!a;isS?rS(d):rT(d)}});}});
 </script>
 </body>

@@ -99,12 +99,4 @@ class EqualWeightCombiner:
         short_mask = combined < short_thresh
         signal[short_mask] = -(short_thresh - combined[short_mask]) / short_thresh
 
-        # Monthly rebalancing: only update signal on month boundaries
-        if self.config.backtest.rebalance_frequency == "monthly":
-            rebalance_mask = combined.index.is_month_start | (
-                combined.index == combined.index[0]
-            )
-            rebalance_signal = signal.where(rebalance_mask)
-            signal = rebalance_signal.ffill().fillna(0.0)
-
         return signal

@@ -39,10 +39,15 @@ def main():
     runner = PortfolioBacktestRunner(config)
 
     print("=" * 80)
-    print("  PORTFOLIO BACKTEST — Graham Long-Only Strategy (Single Account)")
+    print("  PORTFOLIO BACKTEST — Graham Value Strategy (Dynamic Signals)")
     print(f"  Initial Capital: ${config.backtest.initial_cash:,.0f}")
     print(f"  Universe: {len(TOP_100)} stocks")
     print(f"  Period: {config.backtest.start_date} to {config.backtest.end_date}")
+    print(f"  Trailing Stop: {config.backtest.trailing_stop_pct*100:.0f}%")
+    print(f"  Holding Period: {config.backtest.holding_period_days} days")
+    print(f"  Max Positions: {config.backtest.max_positions}")
+    print(f"  Signal Weighted: {config.backtest.signal_weighted}")
+    print(f"  Scale-in: {config.backtest.scale_in} ({config.backtest.scale_in_pct*100:.0f}% initial)")
     print("=" * 80)
     print()
 
@@ -63,7 +68,10 @@ def main():
     print("  PORTFOLIO PERFORMANCE")
     print("=" * 80)
     for key, value in stats.items():
-        print(f"  {key:<30} {value:>15}")
+        if isinstance(value, dict):
+            print(f"  {key:<30} {value}")
+        else:
+            print(f"  {key:<30} {value:>15}")
 
     # Position statistics
     print()
@@ -93,14 +101,17 @@ def main():
     if not trades_df.empty:
         print()
         print(f"  --- Last 20 Trades ---")
-        print(f"  {'Date':<12} {'Ticker':<6} {'Side':<5} {'Shares':>6} "
+        print(f"  {'Date':<12} {'Ticker':<6} {'Side':<5} {'Reason':<14} {'Shares':>6} "
               f"{'Price':>10} {'Value':>12} {'Commission':>10}")
-        print("  " + "-" * 70)
+        print("  " + "-" * 84)
         recent = trades_df.tail(20)
         for _, t in recent.iterrows():
-            print(f"  {str(t['date'])[:10]:<12} {t['ticker']:<6} {t['side']:<5} "
-                  f"{int(t['shares']):>6} ${t['price']:>9.2f} "
-                  f"${t['value']:>11,.2f} ${t['commission']:>9.2f}")
+            reason = t.get('reason', '')
+            print(
+                f"  {str(t['date'])[:10]:<12} {t['ticker']:<6} {t['side']:<5} "
+                f"{reason:<14} {int(t['shares']):>6} ${t['price']:>9.2f} "
+                f"${t['value']:>11,.2f} ${t['commission']:>9.2f}"
+            )
 
     print("=" * 80)
 
@@ -117,9 +128,12 @@ def main():
         "initial_cash": f"{config.backtest.initial_cash:,.0f}",
         "period": f"{config.backtest.start_date} to {config.backtest.end_date}",
         "universe": str(len(TOP_100)),
-        "rebalance": config.backtest.rebalance_frequency.capitalize(),
         "commission": f"{config.backtest.commission*100:.1f}%",
         "factors": ", ".join(config.factors.factors),
+        "trailing_stop_pct": f"{config.backtest.trailing_stop_pct*100:.0f}%",
+        "holding_period_days": str(config.backtest.holding_period_days),
+        "max_positions": str(config.backtest.max_positions),
+        "max_position_weight": f"{config.backtest.max_position_weight*100:.0f}%",
     }
     html_path = generate_html_report(result, config_summary)
 

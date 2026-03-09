@@ -10,6 +10,20 @@ backtest:
   rebalance_frequency: "monthly"
   long_threshold: 0.6
   short_threshold: 0.4
+  # Position sizing
+  signal_weighted: true
+  max_position_weight: 0.25
+  max_positions: 15
+  min_positions: 3
+  cash_reserve_pct: 0.05
+  # Fixed holding period (trading days)
+  holding_period_days: 252
+  # Risk management
+  trailing_stop_pct: 0.20
+  # Scale-in
+  scale_in: true
+  scale_in_pct: 0.50
+  scale_in_days: 5
 
 llm:
   primary_provider: "gemini"

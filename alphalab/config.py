@@ -27,6 +27,24 @@ class BacktestConfig(BaseSettings):
     long_threshold: float = 0.6
     short_threshold: float = 0.4
 
+    # Position sizing
+    signal_weighted: bool = True
+    max_position_weight: float = 0.25
+    max_positions: int = 15
+    min_positions: int = 3
+    cash_reserve_pct: float = 0.05
+
+    # Fixed holding period
+    holding_period_days: int = 252
+
+    # Risk management
+    trailing_stop_pct: float = 0.20
+
+    # Scale-in
+    scale_in: bool = True
+    scale_in_pct: float = 0.50
+    scale_in_days: int = 5
+
 
 class LLMConfig(BaseSettings):
     model_config = {"populate_by_name": True}
