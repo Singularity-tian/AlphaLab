@@ -109,7 +109,7 @@ class GrahamFactor(Factor):
         if self.ratio_key not in ratios:
             return pd.Series(dtype=float, index=date_range)
 
-        series = ratios[self.ratio_key].reindex(date_range, method="ffill")
+        series = ratios[self.ratio_key].reindex(date_range).ffill()
 
         # Sigmoid component (vectorized)
         if self.higher_is_better:
@@ -247,9 +247,9 @@ class GrahamNumberFactor(Factor):
             if key not in ratios:
                 return pd.Series(dtype=float, index=date_range)
 
-        eps = ratios["earnings_per_share"].reindex(date_range, method="ffill")
-        bvps = ratios["book_value_per_share"].reindex(date_range, method="ffill")
-        price = ohlc["Close"].reindex(date_range, method="ffill")
+        eps = ratios["earnings_per_share"].reindex(date_range).ffill()
+        bvps = ratios["book_value_per_share"].reindex(date_range).ffill()
+        price = ohlc["Close"].reindex(date_range).ffill()
 
         # Graham Number = sqrt(22.5 * EPS * BVPS)
         product = 22.5 * eps * bvps

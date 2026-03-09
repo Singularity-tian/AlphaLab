@@ -25,19 +25,25 @@ def generate_html_report(
     trades_df = result["trades"]
     per_stock_pnl = result["per_stock_pnl"]
 
+    def _safe(v):
+        """Convert NaN/inf to None for JSON serialization."""
+        if isinstance(v, float) and (np.isnan(v) or np.isinf(v)):
+            return None
+        return round(v, 2)
+
     # Prepare chart data
     eq_dates = [d.strftime("%Y-%m-%d") for d in equity_curve.index]
-    eq_vals = [round(v, 2) for v in equity_curve.values]
+    eq_vals = [_safe(v) for v in equity_curve.values]
 
     cummax = equity_curve.cummax()
-    dd = [round(v, 2) for v in ((equity_curve - cummax) / cummax * 100).tolist()]
+    dd = [_safe(v) for v in ((equity_curve - cummax) / cummax * 100).tolist()]
 
     # Sample weekly for lighter charts
     step = 5
     pos_dates = [d.strftime("%Y-%m-%d") for d in daily.index[::step]]
-    pos_counts = daily["num_positions"].values[::step].tolist()
-    cash_vals = [round(v, 2) for v in daily["cash"].values[::step]]
-    inv_vals = [round(v, 2) for v in daily["position_value"].values[::step]]
+    pos_counts = [int(v) if not np.isnan(v) else 0 for v in daily["num_positions"].values[::step]]
+    cash_vals = [_safe(v) for v in daily["cash"].values[::step]]
+    inv_vals = [_safe(v) for v in daily["position_value"].values[::step]]
 
     pnl_tickers = per_stock_pnl["ticker"].tolist() if not per_stock_pnl.empty else []
     pnl_values = per_stock_pnl["total_pnl"].tolist() if not per_stock_pnl.empty else []

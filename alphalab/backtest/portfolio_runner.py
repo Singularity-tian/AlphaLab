@@ -271,18 +271,30 @@ class PortfolioBacktestRunner:
 
         # Step 4: Execute buys proportionally (no ordering bias)
         if buy_orders:
-            total_buy_value = sum(shares * price for _, shares, price in buy_orders)
-            for ticker, buy_shares, price in buy_orders:
-                if total_buy_value > 0 and total_buy_value * (1 + commission_rate) > cash:
-                    # Scale down all buys proportionally to fit available cash
-                    scale = cash / (total_buy_value * (1 + commission_rate))
-                    buy_shares = math.floor(buy_shares * scale)
+            total_buy_cost = sum(
+                sh * pr * (1 + commission_rate) for _, sh, pr in buy_orders
+            )
+            # Compute scale ONCE before the loop
+            if total_buy_cost > cash:
+                scale = cash / total_buy_cost
+            else:
+                scale = 1.0
+
+            scaled_orders = [
+                (tk, math.floor(sh * scale), pr)
+                for tk, sh, pr in buy_orders
+            ]
+
+            for ticker, buy_shares, price in scaled_orders:
                 if buy_shares <= 0:
                     continue
                 cost = buy_shares * price
                 commission = cost * commission_rate
+                # Safety guard: never spend more cash than we have
                 if cost + commission > cash:
-                    buy_shares = math.floor(cash / (price * (1 + commission_rate)))
+                    buy_shares = math.floor(
+                        cash / (price * (1 + commission_rate))
+                    )
                     if buy_shares <= 0:
                         continue
                     cost = buy_shares * price

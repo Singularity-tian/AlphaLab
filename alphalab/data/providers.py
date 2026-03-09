@@ -292,7 +292,7 @@ class DataProvider:
         for name, series in ratio_data.items():
             ts = series.sort_index()
             # Reindex to daily OHLC dates and forward-fill
-            daily = ts.reindex(daily_index, method="ffill")
+            daily = ts.reindex(daily_index).ffill()
             result_dict[name] = daily
 
             non_null = daily.notna().sum()

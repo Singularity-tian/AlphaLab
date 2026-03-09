@@ -69,7 +69,7 @@ class TraditionalFactor(Factor):
         if self.ratio_key not in ratios:
             return pd.Series(dtype=float, index=date_range)
 
-        series = ratios[self.ratio_key].reindex(date_range, method="ffill")
+        series = ratios[self.ratio_key].reindex(date_range).ffill()
 
         # Expanding-window percentile rank (no look-ahead)
         rank = series.expanding(min_periods=2).apply(

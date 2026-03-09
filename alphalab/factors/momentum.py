@@ -72,7 +72,7 @@ class MomentumFactor(Factor):
         data: DataProvider,
     ) -> pd.Series:
         ohlc = data.get_ohlc(ticker)
-        close = ohlc["Close"].reindex(date_range, method="ffill")
+        close = ohlc["Close"].reindex(date_range).ffill()
 
         price_past = close.shift(self.lookback_days)
         price_recent = close.shift(self.skip_days)
