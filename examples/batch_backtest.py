@@ -123,9 +123,15 @@ def main():
 
     print("=" * 80)
 
-    # Save full results
-    df.to_csv("reports/batch_backtest_results.csv", index=False)
-    print(f"\nFull results saved to reports/batch_backtest_results.csv")
+    # Save full results into timestamped subfolder
+    from datetime import datetime
+    from pathlib import Path
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    method = "graham"
+    run_dir = Path(f"reports/{method}_{ts}")
+    run_dir.mkdir(parents=True, exist_ok=True)
+    df.to_csv(run_dir / "batch_backtest_results.csv", index=False)
+    print(f"\nFull results saved to {run_dir}/batch_backtest_results.csv")
 
 
 if __name__ == "__main__":

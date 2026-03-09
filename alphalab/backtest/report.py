@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -19,8 +20,9 @@ logger = logging.getLogger(__name__)
 class ReportGenerator:
     """Generates backtest reports with metrics and charts."""
 
-    def __init__(self, output_dir: Path = Path("reports")):
-        self.output_dir = output_dir
+    def __init__(self, output_dir: Path = Path("reports"), method: str = "graham"):
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.output_dir = output_dir / f"{method}_{ts}"
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def generate(

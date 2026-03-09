@@ -115,13 +115,18 @@ def main():
 
     print("=" * 80)
 
-    # Save outputs
-    Path("reports").mkdir(exist_ok=True)
-    equity_curve.to_csv("reports/portfolio_equity_curve.csv", header=True)
+    # Save outputs into a timestamped subfolder
+    from datetime import datetime
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    method = "graham"
+    run_dir = Path(f"reports/{method}_{ts}")
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    equity_curve.to_csv(run_dir / "portfolio_equity_curve.csv", header=True)
     if not trades_df.empty:
-        trades_df.to_csv("reports/portfolio_trades.csv", index=False)
+        trades_df.to_csv(run_dir / "portfolio_trades.csv", index=False)
     if not per_stock_pnl.empty:
-        per_stock_pnl.to_csv("reports/portfolio_per_stock_pnl.csv", index=False)
+        per_stock_pnl.to_csv(run_dir / "portfolio_per_stock_pnl.csv", index=False)
 
     # Generate HTML report
     config_summary = {
@@ -135,13 +140,16 @@ def main():
         "max_positions": str(config.backtest.max_positions),
         "max_position_weight": f"{config.backtest.max_position_weight*100:.0f}%",
     }
-    html_path = generate_html_report(result, config_summary)
+    html_path = generate_html_report(
+        result, config_summary,
+        output_path=run_dir / "portfolio_report.html",
+    )
 
-    print(f"\n  Files saved:")
-    print(f"    reports/portfolio_equity_curve.csv")
-    print(f"    reports/portfolio_trades.csv")
-    print(f"    reports/portfolio_per_stock_pnl.csv")
-    print(f"    {html_path}  ← open in browser")
+    print(f"\n  Files saved to {run_dir}/:")
+    print(f"    portfolio_equity_curve.csv")
+    print(f"    portfolio_trades.csv")
+    print(f"    portfolio_per_stock_pnl.csv")
+    print(f"    portfolio_report.html  ← open in browser")
     print("=" * 80)
 
 

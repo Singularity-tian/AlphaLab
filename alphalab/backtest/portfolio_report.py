@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -13,10 +14,15 @@ import pandas as pd
 def generate_html_report(
     result: dict[str, Any],
     config_summary: dict[str, Any],
-    output_path: str | Path = "reports/portfolio_report.html",
+    output_path: str | Path | None = None,
+    method: str = "graham",
 ) -> str:
     """Generate a self-contained HTML report from portfolio backtest results."""
-    output_path = Path(output_path)
+    if output_path is None:
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_path = Path(f"reports/{method}_{ts}/portfolio_report.html")
+    else:
+        output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     stats = result["stats"]

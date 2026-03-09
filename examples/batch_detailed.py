@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 import logging
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -113,13 +114,19 @@ def main():
 
         time.sleep(0.1)
 
-    # Save trades CSV
+    # Save trades CSV into timestamped subfolder
+    from datetime import datetime
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    method = "graham"
+    run_dir = Path(f"reports/{method}_{ts}")
+    run_dir.mkdir(parents=True, exist_ok=True)
+
     trades_df = pd.DataFrame(all_trades)
-    trades_df.to_csv("reports/batch_all_trades.csv", index=False)
+    trades_df.to_csv(run_dir / "batch_all_trades.csv", index=False)
 
     # Save stock summaries
     summary_df = pd.DataFrame(stock_summaries)
-    summary_df.to_csv("reports/batch_stock_summaries.csv", index=False)
+    summary_df.to_csv(run_dir / "batch_stock_summaries.csv", index=False)
 
     # Print all trades
     print("\n" + "=" * 120)
@@ -164,9 +171,9 @@ def main():
             print(f"  Avg loser:  ${sum(t['trade_pnl'] for t in losers)/len(losers):+,.2f}")
         print(f"  Avg hold period: {sum(t['hold_days'] for t in all_trades)/len(all_trades):.0f} days")
 
-    print(f"\n  Files saved:")
-    print(f"    reports/batch_all_trades.csv      — every trade with full accounting")
-    print(f"    reports/batch_stock_summaries.csv  — per-stock summary")
+    print(f"\n  Files saved to {run_dir}/:")
+    print(f"    batch_all_trades.csv      — every trade with full accounting")
+    print(f"    batch_stock_summaries.csv  — per-stock summary")
     print("=" * 120)
 
 
