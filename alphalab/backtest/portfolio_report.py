@@ -225,6 +225,8 @@ footer{{margin-top:64px;padding-top:24px;border-top:1px solid var(--bd);text-ali
   <div class="kpi"><div class="kpi-l">Annual Return</div><div class="kpi-v {ann_cls}">{stats['Annualized Return [%]']:+.2f}%</div></div>
   <div class="kpi"><div class="kpi-l">Sharpe Ratio</div><div class="kpi-v">{stats['Sharpe Ratio']:.3f}</div></div>
   <div class="kpi"><div class="kpi-l">Sortino Ratio</div><div class="kpi-v">{stats['Sortino Ratio']:.3f}</div></div>
+  <div class="kpi"><div class="kpi-l">Calmar Ratio</div><div class="kpi-v">{stats.get('Calmar Ratio', 0):.3f}</div></div>
+  <div class="kpi"><div class="kpi-l">Profit Factor</div><div class="kpi-v">{stats.get('Profit Factor', 0):.3f}</div></div>
   <div class="kpi"><div class="kpi-l">Max Drawdown</div><div class="kpi-v neg">{stats['Max Drawdown [%]']:.2f}%</div></div>
   <div class="kpi"><div class="kpi-l">Final Equity</div><div class="kpi-v acc">${stats['Equity Final [$]']:,.2f}</div></div>
   <div class="kpi"><div class="kpi-l">Total Trades</div><div class="kpi-v">{stats['# Trades']}</div></div>
@@ -318,7 +320,7 @@ footer{{margin-top:64px;padding-top:24px;border-top:1px solid var(--bd);text-ali
         <li><b>Trailing stop-loss</b>: sell if price drops <code>{trailing_stop_pct}</code> from peak since entry</li>
         <li><b>No cooldown</b>: after stop-loss, can re-buy immediately if signal still good</li>
         <li>Re-buy resets holding period and trailing high to new entry price</li>
-        <li>On expiry: if signal still &gt; 0.6, can re-enter same day (续仓)</li>
+        <li>On expiry: if signal still &gt; 0.6, can re-enter same day</li>
       </ul>
       <p style="margin-top:12px"><b>No signal-based exit</b>: if signal drops below 0.6 mid-holding, position is kept until expiry or stop-loss.</p>
     </div>

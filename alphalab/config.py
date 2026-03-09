@@ -67,6 +67,7 @@ class FactorConfig(BaseSettings):
         "dividend_yield",
     ]
     weights: dict[str, float] = {}
+    sigmoid_weight: float = 0.4  # Graham hybrid: sigmoid vs percentile blend
 
 
 class AlphaLabConfig(BaseSettings):

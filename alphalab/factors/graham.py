@@ -26,9 +26,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Blending weights
-_SIGMOID_WEIGHT = 0.4
-_PERCENTILE_WEIGHT = 0.6
+# Default blending weights (overridden by config.factors.sigmoid_weight)
+_DEFAULT_SIGMOID_WEIGHT = 0.4
 
 
 def _sigmoid(x: float, center: float, steepness: float) -> float:
@@ -54,9 +53,12 @@ class GrahamFactor(Factor):
     higher_is_better: bool = False  # Graham factors mostly favor lower values
 
     def _hybrid_score(
-        self, current_value: float, history: pd.Series
+        self, current_value: float, history: pd.Series,
+        sigmoid_weight: float = _DEFAULT_SIGMOID_WEIGHT,
     ) -> float:
         """Compute blended sigmoid + percentile score."""
+        percentile_weight = 1.0 - sigmoid_weight
+
         # Sigmoid component: maps raw value through Graham threshold
         if self.higher_is_better:
             sig = _sigmoid(current_value, self.graham_threshold, -self.steepness)
@@ -72,7 +74,7 @@ class GrahamFactor(Factor):
                 pct = 1.0 - pct
 
         return float(np.clip(
-            _SIGMOID_WEIGHT * sig + _PERCENTILE_WEIGHT * pct, 0.0, 1.0
+            sigmoid_weight * sig + percentile_weight * pct, 0.0, 1.0
         ))
 
     def compute(
@@ -92,7 +94,8 @@ class GrahamFactor(Factor):
             return None
 
         current_value = available.iloc[-1]
-        score = self._hybrid_score(current_value, available)
+        sw = getattr(getattr(data.config, "factors", None), "sigmoid_weight", _DEFAULT_SIGMOID_WEIGHT)
+        score = self._hybrid_score(current_value, available, sigmoid_weight=sw)
 
         return FactorResult(
             value=score,
@@ -127,7 +130,8 @@ class GrahamFactor(Factor):
         if not self.higher_is_better:
             pct = 1.0 - pct
 
-        score = _SIGMOID_WEIGHT * sig + _PERCENTILE_WEIGHT * pct
+        sw = getattr(getattr(data.config, "factors", None), "sigmoid_weight", _DEFAULT_SIGMOID_WEIGHT)
+        score = sw * sig + (1.0 - sw) * pct
         return score.clip(0.0, 1.0)
 
 
@@ -272,7 +276,8 @@ class GrahamNumberFactor(Factor):
         )
         pct = 1.0 - pct  # Lower ratio is better
 
-        score = _SIGMOID_WEIGHT * sig + _PERCENTILE_WEIGHT * pct
+        sw = getattr(getattr(data.config, "factors", None), "sigmoid_weight", _DEFAULT_SIGMOID_WEIGHT)
+        score = sw * sig + (1.0 - sw) * pct
         # Fill invalid (negative EPS/BVPS) with 0.5 (neutral)
         score = score.fillna(0.5)
         return score.clip(0.0, 1.0)

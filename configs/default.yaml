@@ -39,3 +39,4 @@ factors:
     - current_ratio
     - dividend_yield
   weights: {}
+  sigmoid_weight: 0.4

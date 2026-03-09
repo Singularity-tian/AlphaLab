@@ -460,11 +460,36 @@ class PortfolioBacktestRunner:
         num_trades = len(trades_df)
         total_commission = trades_df["commission"].sum() if num_trades > 0 else 0
 
+        # Calmar ratio: annualized return / |max drawdown|
+        calmar = ann_return / abs(max_dd) if max_dd != 0 else 0.0
+
+        # Profit factor: gross wins / gross losses (per-ticker P&L)
+        profit_factor = 0.0
+        if not trades_df.empty:
+            gross_wins = 0.0
+            gross_losses = 0.0
+            for ticker in trades_df["ticker"].unique():
+                tt = trades_df[trades_df["ticker"] == ticker]
+                buys = tt[tt["side"] == "BUY"]
+                sells = tt[tt["side"] == "SELL"]
+                cost = buys["value"].sum() + buys["commission"].sum()
+                proceeds = sells["value"].sum() - sells["commission"].sum()
+                pnl = proceeds - cost
+                if pnl > 0:
+                    gross_wins += pnl
+                elif pnl < 0:
+                    gross_losses += abs(pnl)
+            profit_factor = gross_wins / gross_losses if gross_losses > 0 else (
+                10.0 if gross_wins > 0 else 0.0
+            )
+
         return {
             "Total Return [%]": round(total_return, 2),
             "Annualized Return [%]": round(ann_return, 2),
             "Sharpe Ratio": round(sharpe, 3),
             "Sortino Ratio": round(sortino, 3),
+            "Calmar Ratio": round(calmar, 3),
+            "Profit Factor": round(profit_factor, 3),
             "Max Drawdown [%]": round(max_dd, 2),
             "Equity Final [$]": round(final_value, 2),
             "# Trades": num_trades,
