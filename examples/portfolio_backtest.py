@@ -14,6 +14,7 @@ import pandas as pd
 
 from alphalab.config import AlphaLabConfig
 from alphalab.backtest.portfolio_runner import PortfolioBacktestRunner
+from alphalab.backtest.portfolio_report import generate_html_report
 
 # Top 100 US stocks by market cap (as of early 2025)
 TOP_100 = [
@@ -111,10 +112,22 @@ def main():
     if not per_stock_pnl.empty:
         per_stock_pnl.to_csv("reports/portfolio_per_stock_pnl.csv", index=False)
 
+    # Generate HTML report
+    config_summary = {
+        "initial_cash": f"{config.backtest.initial_cash:,.0f}",
+        "period": f"{config.backtest.start_date} to {config.backtest.end_date}",
+        "universe": str(len(TOP_100)),
+        "rebalance": config.backtest.rebalance_frequency.capitalize(),
+        "commission": f"{config.backtest.commission*100:.1f}%",
+        "factors": ", ".join(config.factors.factors),
+    }
+    html_path = generate_html_report(result, config_summary)
+
     print(f"\n  Files saved:")
     print(f"    reports/portfolio_equity_curve.csv")
     print(f"    reports/portfolio_trades.csv")
     print(f"    reports/portfolio_per_stock_pnl.csv")
+    print(f"    {html_path}  ← open in browser")
     print("=" * 80)
 
 
