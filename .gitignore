@@ -16,3 +16,8 @@ reports/
 .eggs/
 .venv/
 .claude/
+
+configs/optimized.yaml
+data/optuna_study.db
+data/cache/
+EXPMA&KDJ/sp500_hourly_data/
