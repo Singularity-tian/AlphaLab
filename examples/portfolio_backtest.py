@@ -1,4 +1,4 @@
-"""Portfolio backtest: single $100k account across top 100 stocks."""
+"""Portfolio backtest: single $100k account across S&P 500 stocks."""
 
 from __future__ import annotations
 
@@ -16,18 +16,59 @@ from alphalab.config import AlphaLabConfig
 from alphalab.backtest.portfolio_runner import PortfolioBacktestRunner
 from alphalab.backtest.portfolio_report import generate_html_report
 
-# Top 100 US stocks by market cap (as of early 2025)
-TOP_100 = [
-    "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "BRK-B", "LLY", "AVGO", "JPM",
-    "TSLA", "UNH", "XOM", "V", "MA", "PG", "COST", "JNJ", "HD", "ABBV",
-    "WMT", "NFLX", "BAC", "CRM", "CVX", "MRK", "KO", "ORCL", "AMD", "PEP",
-    "ACN", "TMO", "LIN", "MCD", "CSCO", "ADBE", "ABT", "WFC", "PM", "IBM",
-    "GE", "CAT", "ISRG", "INTU", "TXN", "QCOM", "VZ", "CMCSA", "DHR", "NOW",
-    "AMGN", "PFE", "SPGI", "T", "UNP", "NEE", "RTX", "HON", "LOW", "UPS",
-    "GS", "BLK", "ELV", "BKNG", "SYK", "AXP", "SBUX", "LMT", "MDLZ", "DE",
-    "GILD", "MMC", "PLD", "ADI", "CB", "VRTX", "SCHW", "TMUS", "AMT", "CI",
-    "MO", "DUK", "SO", "BMY", "CME", "CL", "ICE", "ZTS", "SLB", "BDX",
-    "EOG", "APD", "FDX", "NOC", "ITW", "PNC", "USB", "TGT", "MMM", "F",
+# S&P 500 constituents (as of March 2026)
+SP500 = [
+    "A", "AAPL", "ABBV", "ABNB", "ABT", "ACGL", "ACN", "ADBE", "ADI", "ADM",
+    "ADP", "ADSK", "AEE", "AEP", "AES", "AFL", "AIG", "AIZ", "AJG", "AKAM",
+    "ALB", "ALGN", "ALL", "ALLE", "AMAT", "AMCR", "AMD", "AME", "AMGN", "AMP",
+    "AMT", "AMZN", "ANET", "AON", "AOS", "APA", "APD", "APH", "APO", "APP",
+    "APTV", "ARE", "ARES", "ATO", "AVB", "AVGO", "AVY", "AWK", "AXON", "AXP",
+    "AZO", "BA", "BAC", "BALL", "BAX", "BBY", "BDX", "BEN", "BF-B", "BG",
+    "BIIB", "BK", "BKNG", "BKR", "BLDR", "BLK", "BMY", "BR", "BRK-B", "BRO",
+    "BSX", "BX", "BXP", "C", "CAG", "CAH", "CARR", "CAT", "CB", "CBOE",
+    "CBRE", "CCI", "CCL", "CDNS", "CDW", "CEG", "CF", "CFG", "CHD", "CHRW",
+    "CHTR", "CI", "CIEN", "CINF", "CL", "CLX", "CMCSA", "CME", "CMG", "CMI",
+    "CMS", "CNC", "CNP", "COF", "COIN", "COO", "COP", "COR", "COST", "CPAY",
+    "CPB", "CPRT", "CPT", "CRH", "CRL", "CRM", "CRWD", "CSCO", "CSGP", "CSX",
+    "CTAS", "CTRA", "CTSH", "CTVA", "CVNA", "CVS", "CVX", "D", "DAL", "DASH",
+    "DD", "DDOG", "DE", "DECK", "DELL", "DG", "DGX", "DHI", "DHR", "DIS",
+    "DLR", "DLTR", "DOC", "DOV", "DOW", "DPZ", "DRI", "DTE", "DUK", "DVA",
+    "DVN", "DXCM", "EA", "EBAY", "ECL", "ED", "EFX", "EG", "EIX", "EL",
+    "ELV", "EME", "EMR", "EOG", "EPAM", "EQIX", "EQR", "EQT", "ERIE", "ES",
+    "ESS", "ETN", "ETR", "EVRG", "EW", "EXC", "EXE", "EXPD", "EXPE", "EXR",
+    "F", "FANG", "FAST", "FCX", "FDS", "FDX", "FE", "FFIV", "FICO", "FIS",
+    "FISV", "FITB", "FIX", "FOX", "FOXA", "FRT", "FSLR", "FTNT", "FTV", "GD",
+    "GDDY", "GE", "GEHC", "GEN", "GEV", "GILD", "GIS", "GL", "GLW", "GM",
+    "GNRC", "GOOG", "GOOGL", "GPC", "GPN", "GRMN", "GS", "GWW", "HAL", "HAS",
+    "HBAN", "HCA", "HD", "HIG", "HII", "HLT", "HOLX", "HON", "HOOD", "HPE",
+    "HPQ", "HRL", "HSIC", "HST", "HSY", "HUBB", "HUM", "HWM", "IBKR", "IBM",
+    "ICE", "IDXX", "IEX", "IFF", "INCY", "INTC", "INTU", "INVH", "IP", "IQV",
+    "IR", "IRM", "ISRG", "IT", "ITW", "IVZ", "J", "JBHT", "JBL", "JCI",
+    "JKHY", "JNJ", "JPM", "KDP", "KEY", "KEYS", "KHC", "KIM", "KKR", "KLAC",
+    "KMB", "KMI", "KO", "KR", "KVUE", "L", "LDOS", "LEN", "LH", "LHX",
+    "LII", "LIN", "LLY", "LMT", "LNT", "LOW", "LRCX", "LULU", "LUV", "LVS",
+    "LW", "LYB", "LYV", "MA", "MAA", "MAR", "MAS", "MCD", "MCHP", "MCK",
+    "MCO", "MDLZ", "MDT", "MET", "META", "MGM", "MKC", "MLM", "MMM", "MNST",
+    "MO", "MOH", "MOS", "MPC", "MPWR", "MRK", "MRNA", "MRSH", "MS", "MSCI",
+    "MSFT", "MSI", "MTB", "MTCH", "MTD", "MU", "NCLH", "NDAQ", "NDSN", "NEE",
+    "NEM", "NFLX", "NI", "NKE", "NOC", "NOW", "NRG", "NSC", "NTAP", "NTRS",
+    "NUE", "NVDA", "NVR", "NWS", "NWSA", "NXPI", "O", "ODFL", "OKE", "OMC",
+    "ON", "ORCL", "ORLY", "OTIS", "OXY", "PANW", "PAYC", "PAYX", "PCAR", "PCG",
+    "PEG", "PEP", "PFE", "PFG", "PG", "PGR", "PH", "PHM", "PKG", "PLD",
+    "PLTR", "PM", "PNC", "PNR", "PNW", "PODD", "POOL", "PPG", "PPL", "PRU",
+    "PSA", "PSKY", "PSX", "PTC", "PWR", "PYPL", "Q", "QCOM", "RCL", "REG",
+    "REGN", "RF", "RJF", "RL", "RMD", "ROK", "ROL", "ROP", "ROST", "RSG",
+    "RTX", "RVTY", "SBAC", "SBUX", "SCHW", "SHW", "SJM", "SLB", "SMCI", "SNA",
+    "SNDK", "SNPS", "SO", "SOLV", "SPG", "SPGI", "SRE", "STE", "STLD", "STT",
+    "STX", "STZ", "SW", "SWK", "SWKS", "SYF", "SYK", "SYY", "T", "TAP",
+    "TDG", "TDY", "TECH", "TEL", "TER", "TFC", "TGT", "TJX", "TKO", "TMO",
+    "TMUS", "TPL", "TPR", "TRGP", "TRMB", "TROW", "TRV", "TSCO", "TSLA", "TSN",
+    "TT", "TTD", "TTWO", "TXN", "TXT", "TYL", "UAL", "UBER", "UDR", "UHS",
+    "ULTA", "UNH", "UNP", "UPS", "URI", "USB", "V", "VICI", "VLO", "VLTO",
+    "VMC", "VRSK", "VRSN", "VRTX", "VST", "VTR", "VTRS", "VZ", "WAB", "WAT",
+    "WBD", "WDAY", "WDC", "WEC", "WELL", "WFC", "WM", "WMB", "WMT", "WRB",
+    "WSM", "WST", "WTW", "WY", "WYNN", "XEL", "XOM", "XYL", "XYZ", "YUM",
+    "ZBH", "ZBRA", "ZTS",
 ]
 
 logging.basicConfig(level=logging.WARNING, format="%(message)s")
@@ -35,13 +76,13 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    config = AlphaLabConfig.from_yaml("configs/default.yaml")
+    config = AlphaLabConfig.from_yaml("configs/optimized.yaml")
     runner = PortfolioBacktestRunner(config)
 
     print("=" * 80)
     print("  PORTFOLIO BACKTEST — Graham Value Strategy (Dynamic Signals)")
     print(f"  Initial Capital: ${config.backtest.initial_cash:,.0f}")
-    print(f"  Universe: {len(TOP_100)} stocks")
+    print(f"  Universe: {len(SP500)} stocks")
     print(f"  Period: {config.backtest.start_date} to {config.backtest.end_date}")
     print(f"  Trailing Stop: {config.backtest.trailing_stop_pct*100:.0f}%")
     print(f"  Holding Period: {config.backtest.holding_period_days} days")
@@ -53,7 +94,7 @@ def main():
 
     print("Computing signals for all stocks (this may take a few minutes)...")
     start_time = time.time()
-    result = runner.run(TOP_100)
+    result = runner.run(SP500)
     elapsed = time.time() - start_time
     print(f"Completed in {elapsed:.1f}s\n")
 
@@ -132,7 +173,7 @@ def main():
     config_summary = {
         "initial_cash": f"{config.backtest.initial_cash:,.0f}",
         "period": f"{config.backtest.start_date} to {config.backtest.end_date}",
-        "universe": str(len(TOP_100)),
+        "universe": str(len(SP500)),
         "commission": f"{config.backtest.commission*100:.1f}%",
         "factors": ", ".join(config.factors.factors),
         "trailing_stop_pct": f"{config.backtest.trailing_stop_pct*100:.0f}%",
