@@ -21,7 +21,12 @@ import pandas as pd
 # Indicators
 # ---------------------------------------------------------------
 
-def compute_indicators(df: pd.DataFrame, kdj_period: int = 9) -> pd.DataFrame:
+def compute_indicators(
+    df: pd.DataFrame,
+    expma_fast: int = 12,
+    expma_slow: int = 50,
+    kdj_period: int = 9,
+) -> pd.DataFrame:
     """Add EXPMA and KDJ columns to hourly OHLC DataFrame.
 
     Adds: expma12, expma50, K, D, J
@@ -29,8 +34,8 @@ def compute_indicators(df: pd.DataFrame, kdj_period: int = 9) -> pd.DataFrame:
     df = df.copy()
 
     # EXPMA (Exponential Moving Average)
-    df["expma12"] = df["close"].ewm(span=12, adjust=False).mean()
-    df["expma50"] = df["close"].ewm(span=50, adjust=False).mean()
+    df["expma12"] = df["close"].ewm(span=expma_fast, adjust=False).mean()
+    df["expma50"] = df["close"].ewm(span=expma_slow, adjust=False).mean()
 
     # KDJ
     low_n = df["low"].rolling(window=kdj_period).min()
@@ -82,6 +87,12 @@ def run_portfolio(
     max_positions: int = 20,
     position_pct: float = 0.05,
     stop_loss_pct: float = 0.05,
+    expma_fast: int = 12,
+    expma_slow: int = 50,
+    kdj_period: int = 9,
+    j_threshold: float = 0.0,
+    initial_buy_frac: float = 0.5,
+    addon_enabled: bool = True,
 ) -> dict[str, Any]:
     """Run EXPMA+KDJ strategy across multiple stocks with shared capital.
 
@@ -107,9 +118,9 @@ def run_portfolio(
         if not path.exists():
             continue
         df = pd.read_parquet(path)
-        if len(df) < 50:  # need enough bars for EXPMA(50)
+        if len(df) < expma_slow:  # need enough bars for slow EXPMA
             continue
-        df = compute_indicators(df)
+        df = compute_indicators(df, expma_fast=expma_fast, expma_slow=expma_slow, kdj_period=kdj_period)
         all_data[ticker] = df
 
     valid_tickers = list(all_data.keys())
@@ -244,7 +255,7 @@ def run_portfolio(
                     continue
 
                 # Buy conditions: EXPMA(12) > EXPMA(50) AND J_prev < 0 AND J_now > J_prev
-                if expma12_now > expma50_now and j_prev < 0 and j_now > j_prev:
+                if expma12_now > expma50_now and j_prev < j_threshold and j_now > j_prev:
                     buy_candidates.append((ticker, close_now))
 
             # Sort by... just take first available (or could sort by J momentum)
@@ -253,8 +264,8 @@ def run_portfolio(
                 portfolio_value = cash + _mark_to_market(positions, ticker_arrays, i)
                 alloc = portfolio_value * position_pct
 
-                # Buy 50% initially
-                initial_alloc = alloc * 0.5
+                # Buy initial fraction
+                initial_alloc = alloc * initial_buy_frac
                 shares = math.floor(initial_alloc / (price * (1 + commission)))
                 if shares <= 0:
                     continue
@@ -274,7 +285,7 @@ def run_portfolio(
                     ticker=ticker,
                     shares=shares,
                     avg_cost=price,
-                    fully_invested=False,
+                    fully_invested=not addon_enabled,
                     entry_bar=i,
                     allocated_capital=alloc,
                 )
@@ -283,7 +294,8 @@ def run_portfolio(
                     cost, comm, cash, "SIGNAL_ENTRY",
                 ))
                 # Schedule add-on for next bar
-                pending_addon[ticker] = i + 1
+                if addon_enabled:
+                    pending_addon[ticker] = i + 1
 
                 if len(positions) >= max_positions:
                     break
