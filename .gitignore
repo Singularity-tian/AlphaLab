@@ -20,4 +20,5 @@ reports/
 configs/optimized.yaml
 data/optuna_study.db
 data/cache/
-EXPMA&KDJ/sp500_hourly_data/
+expma&kdj/sp500_hourly_data/
+expma&kdj/results/
