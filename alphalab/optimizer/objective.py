@@ -70,9 +70,9 @@ def objective(
     If train_period and test_period are provided, runs walk-forward validation:
     optimizes on train, validates on test, penalizes train/test gap.
     """
-    # --- Sample parameters ---
+    # --- Sample parameters (8 total) ---
 
-    # Tier 1: Factor weights
+    # Tier 1: Factor weights (5 params)
     weights = {
         "graham_pe": trial.suggest_float("w_graham_pe", 0.0, 3.0),
         "price_to_book": trial.suggest_float("w_price_to_book", 0.0, 3.0),
@@ -81,16 +81,12 @@ def objective(
         "dividend_yield": trial.suggest_float("w_dividend_yield", 0.0, 3.0),
     }
 
-    # Tier 2: Signal thresholds
+    # Tier 2: Signal thresholds (2 params)
     long_threshold = trial.suggest_float("long_threshold", 0.45, 0.75)
     sigmoid_weight = trial.suggest_float("sigmoid_weight", 0.1, 0.9)
-    holding_period = trial.suggest_int("holding_period", 63, 504, step=21)
 
-    # Tier 3: Risk management
+    # Tier 3: Risk management (1 param)
     trailing_stop = trial.suggest_float("trailing_stop_pct", 0.10, 0.35)
-    max_pos_weight = trial.suggest_float("max_position_weight", 0.10, 0.40)
-    max_positions = trial.suggest_int("max_positions", 5, 25)
-    scale_in_pct = trial.suggest_float("scale_in_pct", 0.3, 1.0)
 
     def _build_config(start: str, end: str) -> AlphaLabConfig:
         config = AlphaLabConfig.from_yaml(config_path)
@@ -98,10 +94,6 @@ def objective(
         config.factors.sigmoid_weight = sigmoid_weight
         config.backtest.long_threshold = long_threshold
         config.backtest.trailing_stop_pct = trailing_stop
-        config.backtest.max_position_weight = max_pos_weight
-        config.backtest.max_positions = max_positions
-        config.backtest.holding_period_days = holding_period
-        config.backtest.scale_in_pct = scale_in_pct
         config.backtest.start_date = start
         config.backtest.end_date = end
         return config

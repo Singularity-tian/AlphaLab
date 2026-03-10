@@ -18,14 +18,7 @@ load_dotenv()
 from alphalab.optimizer.runner import run_optimization
 from alphalab.optimizer.report import print_optimization_report
 from alphalab.optimizer.apply import apply_best_params
-
-# Top 30 stocks for faster optimization (~30s per trial vs ~77s with 100)
-OPTIMIZE_UNIVERSE = [
-    "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "BRK-B", "JPM",
-    "V", "MA", "PG", "JNJ", "HD", "WMT", "BAC", "CVX", "MRK", "KO",
-    "PEP", "CSCO", "ABT", "WFC", "PM", "IBM", "GE", "CAT", "VZ", "T",
-    "GS", "MMM",
-]
+from examples.portfolio_backtest import SP500
 
 logging.basicConfig(level=logging.WARNING, format="%(message)s")
 
@@ -41,21 +34,23 @@ def main():
     print("=" * 80)
     print("  BAYESIAN PARAMETER OPTIMIZATION")
     print(f"  Trials: {args.n_trials}")
-    print(f"  Universe: {len(OPTIMIZE_UNIVERSE)} stocks")
+    print(f"  Universe: {len(SP500)} stocks (S&P 500)")
     print(f"  Walk-forward: {args.walk_forward}")
     if args.walk_forward:
-        print(f"  Train: 2019-01-01 to 2022-12-31")
-        print(f"  Test:  2023-01-01 to 2024-12-31")
+        print(f"  Train: 2019-01-01 to 2023-12-31")
+        print(f"  Test:  2024-01-01 to 2025-12-31")
     print(f"  Storage: sqlite:///data/optuna_study.db")
     print("=" * 80)
     print()
 
     study = run_optimization(
-        tickers=OPTIMIZE_UNIVERSE,
+        tickers=SP500,
         n_trials=args.n_trials,
         study_name=args.study_name,
         n_jobs=args.n_jobs,
         walk_forward=args.walk_forward,
+        train_period=("2019-01-01", "2023-12-31"),
+        test_period=("2024-01-01", "2025-12-31"),
     )
 
     print_optimization_report(study)

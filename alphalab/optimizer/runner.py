@@ -17,7 +17,7 @@ def run_optimization(
     study_name: str = "alphalab_v1",
     storage: str = "sqlite:///data/optuna_study.db",
     n_jobs: int = 1,
-    config_path: str = "configs/default.yaml",
+    config_path: str = "configs/optimized.yaml",
     walk_forward: bool = False,
     train_period: tuple[str, str] = ("2019-01-01", "2022-12-31"),
     test_period: tuple[str, str] = ("2023-01-01", "2024-12-31"),
