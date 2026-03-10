@@ -59,40 +59,95 @@ class DataProvider:
 
         Returns DataFrame with columns: Open, High, Low, Close, Volume
         and a DatetimeIndex.
+
+        Downloads full history (from 2015-01-01) and caches it date-independently,
+        then slices to the requested backtest date range.
         """
-        cache_key = f"ohlc_{ticker}_{self.config.backtest.start_date}_{self.config.backtest.end_date}"
-        cached = self.cache.get_df(cache_key)
-        if cached is not None:
-            return cached
+        # Date-independent cache: download full history once per ticker
+        full_cache_key = f"ohlc_full_{ticker}"
+        full_df = self.cache.get_df(full_cache_key)
 
-        t = self._get_yf_ticker(ticker)
-        hist = t.history(
-            start=self.config.backtest.start_date,
-            end=self.config.backtest.end_date,
-        )
+        if full_df is not None:
+            logger.info("OHLC %s: using cached data (%d rows)", ticker, len(full_df))
 
-        if hist.empty:
-            raise ValueError(f"No OHLC data returned for {ticker}")
+        if full_df is None:
+            logger.info("OHLC %s: downloading from yfinance", ticker)
+            t = self._get_yf_ticker(ticker)
+            hist = t.history(start="2015-01-01")
 
-        # yfinance returns timezone-aware index; strip timezone for compatibility
-        if hist.index.tz is not None:
-            hist.index = hist.index.tz_localize(None)
-        hist.index.name = None
+            if hist.empty:
+                raise ValueError(f"No OHLC data returned for {ticker}")
 
-        # Keep only OHLC + Volume columns
-        keep_cols = ["Open", "High", "Low", "Close", "Volume"]
-        hist = hist[[c for c in keep_cols if c in hist.columns]]
+            # yfinance returns timezone-aware index; strip timezone for compatibility
+            if hist.index.tz is not None:
+                hist.index = hist.index.tz_localize(None)
+            hist.index.name = None
 
-        for col in ["Open", "High", "Low", "Close"]:
-            if col not in hist.columns:
-                raise ValueError(f"Missing required OHLC column: {col}")
+            # Keep only OHLC + Volume columns
+            keep_cols = ["Open", "High", "Low", "Close", "Volume"]
+            hist = hist[[c for c in keep_cols if c in hist.columns]]
 
-        self.cache.set_df(cache_key, hist)
-        return hist
+            for col in ["Open", "High", "Low", "Close"]:
+                if col not in hist.columns:
+                    raise ValueError(f"Missing required OHLC column: {col}")
+
+            self.cache.set_df(full_cache_key, hist)
+            full_df = hist
+
+        # Slice to requested date range
+        start = self.config.backtest.start_date
+        end = self.config.backtest.end_date
+        sliced = full_df.loc[start:end]
+
+        if sliced.empty:
+            raise ValueError(f"No OHLC data for {ticker} in range {start} to {end}")
+
+        return sliced
 
     # ------------------------------------------------------------------
     # Financial ratios (FMP stable API — 80 quarters)
     # ------------------------------------------------------------------
+
+    def _get_fmp_statements(self, ticker: str) -> tuple[list[dict], list[dict], list[dict]]:
+        """Fetch and cache raw FMP financial statements (date-independent).
+
+        Returns (income, balance, cashflow) lists. Each is cached separately
+        so that different backtest date ranges share the same raw data.
+        """
+        income_key = f"fmp_income_{ticker}"
+        balance_key = f"fmp_balance_{ticker}"
+        cashflow_key = f"fmp_cashflow_{ticker}"
+
+        income = self.cache.get_json(income_key)
+        balance = self.cache.get_json(balance_key)
+        cashflow = self.cache.get_json(cashflow_key)
+
+        if income is not None and balance is not None and cashflow is not None:
+            logger.info("FMP %s: using cached statements", ticker)
+            return income, balance, cashflow
+
+        logger.info("FMP %s: downloading from API", ticker)
+        try:
+            if income is None:
+                income = self._fmp_get(
+                    "income-statement", {"symbol": ticker, "period": "quarter", "limit": 80}
+                )
+                self.cache.set_json(income_key, income)
+            if balance is None:
+                balance = self._fmp_get(
+                    "balance-sheet-statement", {"symbol": ticker, "period": "quarter", "limit": 80}
+                )
+                self.cache.set_json(balance_key, balance)
+            if cashflow is None:
+                cashflow = self._fmp_get(
+                    "cash-flow-statement", {"symbol": ticker, "period": "quarter", "limit": 80}
+                )
+                self.cache.set_json(cashflow_key, cashflow)
+        except Exception as e:
+            logger.warning("FMP API error for %s: %s", ticker, e)
+            return income or [], balance or [], cashflow or []
+
+        return income, balance, cashflow
 
     def get_ratios(self, ticker: str) -> dict[str, pd.Series]:
         """Get financial ratios as daily-frequency Series (forward-filled).
@@ -100,6 +155,9 @@ class DataProvider:
         Uses FMP stable API for quarterly financial statements (up to 80
         quarters / 20 years), then computes ratios and forward-fills to
         daily OHLC frequency.
+
+        Raw FMP statements are cached date-independently per ticker.
+        Computed ratios are cached per ticker+date range for speed.
 
         Returns dict mapping ratio name to pd.Series with DatetimeIndex.
         """
@@ -112,20 +170,7 @@ class DataProvider:
 
         ohlc = self.get_ohlc(ticker)
 
-        # Fetch all three statement types from FMP
-        try:
-            income = self._fmp_get(
-                "income-statement", {"symbol": ticker, "period": "quarter", "limit": 80}
-            )
-            balance = self._fmp_get(
-                "balance-sheet-statement", {"symbol": ticker, "period": "quarter", "limit": 80}
-            )
-            cashflow = self._fmp_get(
-                "cash-flow-statement", {"symbol": ticker, "period": "quarter", "limit": 80}
-            )
-        except Exception as e:
-            logger.warning("FMP API error for %s: %s", ticker, e)
-            return {}
+        income, balance, cashflow = self._get_fmp_statements(ticker)
 
         if not income and not balance and not cashflow:
             logger.warning("No FMP statement data for %s", ticker)

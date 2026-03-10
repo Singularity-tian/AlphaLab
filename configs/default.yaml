@@ -1,6 +1,6 @@
 data:
   cache_dir: "data/cache"
-  cache_ttl_hours: 24
+  cache_ttl_hours: 87600
 
 backtest:
   initial_cash: 100000

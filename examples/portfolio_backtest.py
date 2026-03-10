@@ -71,7 +71,7 @@ SP500 = [
     "ZBH", "ZBRA", "ZTS",
 ]
 
-logging.basicConfig(level=logging.WARNING, format="%(message)s")
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
 

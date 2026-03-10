@@ -1,11 +1,11 @@
 data:
   cache_dir: data/cache
-  cache_ttl_hours: 24
+  cache_ttl_hours: 87600
 backtest:
   initial_cash: 100000
   commission: 0.001
-  start_date: '2022-01-01'
-  end_date: '2023-12-31'
+  start_date: '2023-01-01'
+  end_date: '2026-12-31'
   rebalance_frequency: monthly
   long_threshold: 0.5 # 0.4639
   short_threshold: 0.4
