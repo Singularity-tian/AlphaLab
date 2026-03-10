@@ -1,4 +1,8 @@
-"""Batch backtest: run Graham strategy on top 100 stocks by market cap."""
+"""Batch backtest: run Graham strategy on top 100 stocks by market cap.
+
+Usage:
+    python strategies/graham_value/batch_run.py
+"""
 
 from __future__ import annotations
 
@@ -14,6 +18,8 @@ import pandas as pd
 
 from alphalab.config import AlphaLabConfig
 from alphalab.backtest.runner import BacktestRunner
+
+import strategies.graham_value.factors  # noqa: F401  — register Graham factors
 
 # Top 100 US stocks by market cap (as of early 2025)
 TOP_100 = [
@@ -34,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    config = AlphaLabConfig.from_yaml("configs/default.yaml")
+    config = AlphaLabConfig.from_yaml("strategies/graham_value/configs/default.yaml")
     runner = BacktestRunner(config)
 
     results = []
@@ -128,7 +134,7 @@ def main():
     from pathlib import Path
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     method = "graham"
-    run_dir = Path(f"reports/{method}_{ts}")
+    run_dir = Path(__file__).parent / "reports" / f"{method}_{ts}"
     run_dir.mkdir(parents=True, exist_ok=True)
     df.to_csv(run_dir / "batch_backtest_results.csv", index=False)
     print(f"\nFull results saved to {run_dir}/batch_backtest_results.csv")

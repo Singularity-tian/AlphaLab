@@ -14,7 +14,7 @@ class DataConfig(BaseSettings):
     model_config = {"populate_by_name": True}
 
     fmp_api_key: str = Field(default="", alias="FMP_API_KEY")
-    cache_dir: Path = Path("data/cache")
+    cache_dir: Path = Path("data/sp500_daily/cache")
     cache_ttl_hours: int = 24
 
 
@@ -59,15 +59,9 @@ class LLMConfig(BaseSettings):
 
 
 class FactorConfig(BaseSettings):
-    factors: list[str] = [
-        "graham_pe",
-        "price_to_book",
-        "graham_number",
-        "current_ratio",
-        "dividend_yield",
-    ]
+    factors: list[str] = []
     weights: dict[str, float] = {}
-    sigmoid_weight: float = 0.4  # Graham hybrid: sigmoid vs percentile blend
+    sigmoid_weight: float = 0.4  # Hybrid normalization: sigmoid vs percentile blend
 
 
 class AlphaLabConfig(BaseSettings):
@@ -83,10 +77,3 @@ class AlphaLabConfig(BaseSettings):
         with open(path) as f:
             raw = yaml.safe_load(f) or {}
         return cls(**raw)
-
-    @classmethod
-    def default(cls) -> AlphaLabConfig:
-        default_path = Path("configs/default.yaml")
-        if default_path.exists():
-            return cls.from_yaml(default_path)
-        return cls()

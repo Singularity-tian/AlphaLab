@@ -9,35 +9,74 @@ Think of it as the R&D lab for an AI-native hedge fund. Many components (RL loop
 ## Project Layout
 
 ```
-alphalab/                     # Core library
-  factors/                    # Factor computation (THE CORE)
-    base.py                   # Factor ABC, FactorResult(value, confidence, metadata)
-    registry.py               # @register_factor, get_factor(), list_factors()
-    graham.py                 # 5 Graham value factors (hybrid sigmoid + percentile)
-    traditional.py            # PE, ROE, FCF Yield (expanding-window percentile rank)
-    momentum.py               # 12-1 price momentum
-    llm_judgment.py           # Anonymized earnings → LLM → sentiment score
-  data/
-    providers.py              # DataProvider: yfinance (OHLC) + FMP stable API (financials)
-    cache.py                  # File cache with TTL (Parquet for DataFrames, JSON for dicts)
-  combiner/
-    equal_weight.py           # Factor scores → weighted avg → trading signal
-  backtest/
-    runner.py                 # BacktestRunner + FactorStrategy (backtesting.py)
-    report.py                 # Charts, metrics, factor attribution
-  anonymizer/
-    pipeline.py               # Entity/temporal/product masking for LLM factors
-    verification.py           # Leak detection
-  llm/
-    client.py                 # Gemini/Claude unified client
-    prompts.py                # Structured prompts for sentiment scoring
-  config.py                   # Pydantic settings (YAML + env vars)
+data/                             # Shared data storage
+  sp500_daily/                    # Daily OHLC + financials
+    download.py                   # Download script (yfinance + FMP)
+    cache/                        # Cached API responses (gitignored)
+  sp500_hourly/                   # Hourly OHLC data
+    download.py                   # Download script (FMP hourly API)
+    cache/                        # Parquet files per ticker (gitignored)
 
-configs/default.yaml          # Default configuration
-examples/                     # Entry points and tutorials
-tests/                        # pytest suite (31 tests)
-reports/                      # Generated backtest outputs
-data/cache/                   # Cached API responses (gitignored)
+alphalab/                         # Shared infrastructure (strategy-agnostic)
+  factors/                        # Factor computation (THE CORE)
+    base.py                       # Factor ABC, FactorResult(value, confidence, metadata)
+    registry.py                   # @register_factor, get_factor(), list_factors()
+    traditional.py                # PE, ROE, FCF Yield (expanding-window percentile rank)
+    momentum.py                   # 12-1 price momentum
+    llm_judgment.py               # Anonymized earnings → LLM → sentiment score
+    business_resilience.py        # Two-stage LLM business resilience scoring
+  data/
+    providers.py                  # DataProvider: yfinance (OHLC) + FMP stable API (financials)
+    cache.py                      # File cache with TTL (Parquet for DataFrames, JSON for dicts)
+    tickers.py                    # Stock universes (SP500 list)
+  combiner/
+    equal_weight.py               # Factor scores → weighted avg → trading signal
+  backtest/
+    runner.py                     # BacktestRunner + FactorStrategy (backtesting.py)
+    portfolio_runner.py           # PortfolioBacktestRunner (multi-stock)
+    report.py                     # Charts, metrics, factor attribution
+    portfolio_report.py           # Portfolio HTML report
+  anonymizer/
+    pipeline.py                   # Entity/temporal/product masking for LLM factors
+    verification.py               # Leak detection
+  llm/
+    client.py                     # Gemini/Claude unified client
+    prompts.py                    # Structured prompts for sentiment scoring
+  optimizer/                      # Generic hyperparameter optimization
+    runner.py                     # Optuna study orchestration
+    objective.py                  # Backtest reward function (accepts strategy search space)
+    apply.py                      # Write best params to YAML
+    report.py                     # Print optimization results
+  config.py                       # Pydantic settings (YAML + env vars)
+
+strategies/                       # Independent strategy modules
+  graham_value/                   # Benjamin Graham value investing strategy
+    factors.py                    # 5 Graham factors (hybrid sigmoid + percentile)
+    configs/                      # Strategy configs
+      default.yaml                # Default parameters
+      optimized.yaml              # Optimized parameters (from optimizer)
+    run.py                        # Single-stock backtest entry point
+    portfolio_run.py              # Full S&P 500 portfolio backtest
+    batch_run.py                  # Quick summary on top 100 stocks
+    batch_run_detailed.py         # Detailed trade-level analysis
+    optimize.py                   # Bayesian parameter tuning (owns search space)
+    reports/                      # Generated backtest outputs (gitignored)
+    tests/                        # Strategy-specific tests
+      test_graham_factors.py
+  expma_kdj/                      # EXPMA(12) & KDJ hourly technical strategy
+    strategy.py                   # Core strategy logic
+    run.py                        # Entry point
+    report.py                     # HTML report generator
+    configs/                      # Strategy configs
+      default.yaml                # Backtest parameters
+    reports/                      # Backtest output (gitignored)
+
+tests/                            # Shared infrastructure tests
+  conftest.py                     # Pytest fixtures & mock DataProvider
+  test_factors.py                 # Traditional + momentum factor tests
+  test_backtest.py                # Backtesting infrastructure tests
+  test_anonymizer.py              # Anonymization tests
+  test_business_resilience.py     # Business resilience factor tests
 ```
 
 ## Key Concepts
@@ -63,7 +102,7 @@ data/cache/                   # Cached API responses (gitignored)
 
 ### How Factors Are Normalized
 - **TraditionalFactor** (traditional.py): expanding-window percentile rank. No look-ahead bias.
-- **GrahamFactor** (graham.py): `0.4 * sigmoid(raw, threshold, steepness) + 0.6 * percentile_rank`. Anchors in absolute Graham thresholds while adapting to relative history.
+- **GrahamFactor** (strategies/graham_value/factors.py): `0.4 * sigmoid(raw, threshold, steepness) + 0.6 * percentile_rank`. Anchors in absolute Graham thresholds while adapting to relative history.
 - All factors MUST return values in [0, 1]. Factors return `FactorResult(value=..., confidence=..., metadata={...})`.
 
 ## How to Run
@@ -71,11 +110,22 @@ data/cache/                   # Cached API responses (gitignored)
 ```bash
 source .venv/bin/activate
 
-# Single stock backtest
-python examples/quickstart.py --no-llm
+# Graham value strategy
+python strategies/graham_value/run.py                # single stock
+python strategies/graham_value/run.py --ticker MSFT
+python strategies/graham_value/portfolio_run.py      # full S&P 500 portfolio
+python strategies/graham_value/batch_run.py          # quick summary on 100 stocks
+python strategies/graham_value/optimize.py           # Bayesian parameter tuning
+
+# EXPMA+KDJ hourly strategy
+python strategies/expma_kdj/run.py
+
+# Download data for offline use
+python data/sp500_daily/download.py
+python data/sp500_hourly/download.py
 
 # Tests
-pytest tests/ -v
+pytest tests/ strategies/ -v
 ```
 
 Environment variables needed (put in `.env`):
@@ -110,7 +160,25 @@ class MyFactor(Factor):
         ...
 ```
 
-Add the factor name to `configs/default.yaml` under `factors.factors` to include it in backtests.
+For basic/generic factors, put them in `alphalab/factors/`. For cohesive strategy-specific factor groups, create a new folder under `strategies/` (e.g., `strategies/my_strategy/factors.py`) with its own `configs/default.yaml` and `run.py`. Each strategy entry point imports its own factors to trigger registration.
+
+Add the factor name to your strategy's `configs/default.yaml` under `factors.factors` to include it in backtests.
+
+## Strategy Template
+
+Each strategy under `strategies/` should follow this structure:
+```
+strategies/my_strategy/
+  __init__.py
+  factors.py              # Factor definitions with @register_factor
+  configs/
+    default.yaml          # Default parameters
+    optimized.yaml        # Optimized parameters (optional)
+  run.py                  # Entry point (imports own factors)
+  optimize.py             # Bayesian tuning (defines own search space)
+  reports/                # Generated outputs (gitignored)
+  tests/                  # Strategy-specific tests
+```
 
 ## Available Data from DataProvider
 
@@ -125,11 +193,11 @@ data.get_earnings_transcripts(ticker, year, quarter)  # str or None
 data.get_available_transcript_dates(ticker)            # list[(year, quarter)]
 ```
 
-## Configuration (configs/default.yaml)
+## Configuration (strategies/graham_value/configs/default.yaml)
 
 ```yaml
 data:
-  cache_dir: "data/cache"
+  cache_dir: "data/sp500_daily/cache"
   cache_ttl_hours: 24
 
 backtest:
@@ -151,7 +219,6 @@ factors:
 - **LLM factor formula generation**: LLM proposes new ratio formulas, backtested automatically
 - **Factor weight optimization**: Learn optimal factor weights from historical performance
 - **Reinforcement learning loop**: Backtest results feed back to improve factors
-- **Multi-stock portfolio mode**: Single portfolio across stock universe with capital allocation
 - **Risk management**: Stop-loss, take-profit, max position size, sector limits
 - **Factor decay detection**: Monitor when factors lose predictive power over time
 - **Forward testing**: Paper trading with live data feed
@@ -163,16 +230,18 @@ factors:
 
 - All factor scores are normalized to [0, 1]
 - Factor registration uses `@register_factor` decorator
+- Strategy-specific factors are imported by their own entry points (not by alphalab/)
 - DataProvider results are cached automatically (Parquet for DataFrames, JSON for metadata)
 - Configuration flows from YAML → Pydantic settings → env var override
 - Tests use mock DataProvider (no network calls). Fixtures in `tests/conftest.py`
-- Factor modules must be imported to register — `alphalab/factors/__init__.py` handles this
+- Shared infra tests in `tests/`, strategy tests in `strategies/*/tests/`
 
 ## Testing
 
 ```bash
-pytest tests/ -v          # 31 tests, ~0.5s
-pytest tests/ -k graham   # just Graham factor tests
+pytest tests/ strategies/ -v    # All tests
+pytest tests/ -v                # Shared infra tests only
+pytest strategies/graham_value/tests/ -v   # Graham strategy tests only
 ```
 
 Tests use synthetic OHLC data and mock DataProvider. No API keys needed for tests.

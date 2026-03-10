@@ -73,7 +73,7 @@ class EarningsSentimentFactor(Factor):
         self._llm_client: Optional[LLMClient] = None
         self._anonymizer = AnonymizationPipeline()
         self._sentiment_cache = FileCache(
-            cache_dir=Path("data/cache/sentiment"),
+            cache_dir=Path("data/sp500_daily/cache/sentiment"),
             ttl_hours=24 * 30,
         )
 

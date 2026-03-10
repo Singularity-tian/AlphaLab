@@ -20,7 +20,7 @@ def generate_html_report(
 ) -> str:
     """Generate a self-contained HTML report from EXPMA&KDJ backtest results."""
     if output_path is None:
-        output_path = Path("expma&kdj/results/report.html")
+        output_path = Path("strategies/expma_kdj/results/report.html")
     else:
         output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)

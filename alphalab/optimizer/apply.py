@@ -10,8 +10,8 @@ import yaml
 
 def apply_best_params(
     study: optuna.Study,
-    base_config_path: str = "configs/default.yaml",
-    output_path: str = "configs/optimized.yaml",
+    base_config_path: str,
+    output_path: str,
 ) -> str:
     """Write best trial parameters to a new YAML config file.
 
@@ -22,20 +22,21 @@ def apply_best_params(
 
     best = study.best_trial.params
 
-    # Factor weights
-    weight_keys = ["w_graham_pe", "w_price_to_book", "w_graham_number",
-                   "w_current_ratio", "w_dividend_yield"]
+    # Factor weights — any param starting with "w_" maps to factors.weights
     weights = {}
-    for k in weight_keys:
-        if k in best:
+    for k, v in best.items():
+        if k.startswith("w_"):
             factor_name = k[2:]  # strip "w_" prefix
-            weights[factor_name] = round(best[k], 4)
+            weights[factor_name] = round(v, 4)
 
-    if "factors" not in config:
-        config["factors"] = {}
-    config["factors"]["weights"] = weights
+    if weights:
+        if "factors" not in config:
+            config["factors"] = {}
+        config["factors"]["weights"] = weights
 
     if "sigmoid_weight" in best:
+        if "factors" not in config:
+            config["factors"] = {}
         config["factors"]["sigmoid_weight"] = round(best["sigmoid_weight"], 4)
 
     # Backtest params

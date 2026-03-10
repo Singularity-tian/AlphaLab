@@ -1,4 +1,8 @@
-"""Batch backtest with full trade-level detail for every stock."""
+"""Batch backtest with full trade-level detail for every stock.
+
+Usage:
+    python strategies/graham_value/batch_run_detailed.py
+"""
 
 from __future__ import annotations
 
@@ -14,6 +18,8 @@ import pandas as pd
 
 from alphalab.config import AlphaLabConfig
 from alphalab.backtest.runner import BacktestRunner
+
+import strategies.graham_value.factors  # noqa: F401  — register Graham factors
 
 TOP_100 = [
     "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "BRK-B", "LLY", "AVGO", "JPM",
@@ -32,7 +38,7 @@ logging.basicConfig(level=logging.WARNING, format="%(message)s")
 
 
 def main():
-    config = AlphaLabConfig.from_yaml("configs/default.yaml")
+    config = AlphaLabConfig.from_yaml("strategies/graham_value/configs/default.yaml")
     initial_cash = config.backtest.initial_cash
     runner = BacktestRunner(config)
 
@@ -118,7 +124,7 @@ def main():
     from datetime import datetime
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     method = "graham"
-    run_dir = Path(f"reports/{method}_{ts}")
+    run_dir = Path(__file__).parent / "reports" / f"{method}_{ts}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
     trades_df = pd.DataFrame(all_trades)

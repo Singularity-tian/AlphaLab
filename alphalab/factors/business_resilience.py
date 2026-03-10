@@ -58,7 +58,7 @@ class BusinessResilienceFactor(Factor):
     def __init__(self):
         self._llm_client: Optional[LLMClient] = None
         self._cache = FileCache(
-            cache_dir=Path("data/cache/resilience"),
+            cache_dir=Path("data/sp500_daily/cache/resilience"),
             ttl_hours=24 * 90,  # 90-day TTL
         )
 

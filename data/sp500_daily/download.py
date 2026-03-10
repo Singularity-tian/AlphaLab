@@ -1,11 +1,11 @@
-"""Download all S&P 500 OHLC and financial data for offline evaluation.
+"""Download all S&P 500 daily OHLC and financial data for offline evaluation.
 
-Run this once to populate the cache, then run portfolio_backtest.py
-and optimize.py without hitting APIs.
+Run this once to populate the cache, then run strategy backtests
+without hitting APIs.
 
 Usage:
-    python examples/download_sp500_data.py
-    python examples/download_sp500_data.py --ohlc-only   # skip FMP financials
+    python data/sp500_daily/download.py
+    python data/sp500_daily/download.py --ohlc-only   # skip FMP financials
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ load_dotenv()
 
 from alphalab.config import AlphaLabConfig
 from alphalab.data.providers import DataProvider
-from examples.portfolio_backtest import SP500
+from alphalab.data.tickers import SP500
 
 logging.basicConfig(level=logging.WARNING, format="%(message)s")
 
@@ -30,8 +30,7 @@ def main():
     parser.add_argument("--ohlc-only", action="store_true", help="Skip FMP financials")
     args = parser.parse_args()
 
-    config = AlphaLabConfig.default()
-    # Use long TTL so downloaded data persists
+    config = AlphaLabConfig()
     config.data.cache_ttl_hours = 87600
     data = DataProvider(config)
 

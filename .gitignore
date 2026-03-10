@@ -8,8 +8,6 @@ build/
 .pytest_cache/
 .ruff_cache/
 .env
-data/cache/
-reports/
 *.html
 .DS_Store
 *.egg
@@ -17,8 +15,12 @@ reports/
 .venv/
 .claude/
 
-configs/optimized.yaml
-data/optuna_study.db
-data/cache/
-expma&kdj/sp500_hourly_data/
-expma&kdj/results/
+# Data caches
+data/sp500_daily/cache/
+data/sp500_hourly/cache/
+
+# Strategy outputs
+strategies/*/reports/
+strategies/*/optuna_study.db
+strategies/*/configs/
+strategies/*/*.db

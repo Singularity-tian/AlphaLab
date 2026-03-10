@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 
 import optuna
 
@@ -61,39 +62,35 @@ def compute_reward(stats: dict) -> float:
 def objective(
     trial: optuna.Trial,
     tickers: list[str],
-    config_path: str = "configs/default.yaml",
+    config_path: str,
+    suggest_params: Callable[[optuna.Trial], dict],
     train_period: tuple[str, str] | None = None,
     test_period: tuple[str, str] | None = None,
 ) -> float:
     """Single backtest evaluation with trial-suggested parameters.
 
-    If train_period and test_period are provided, runs walk-forward validation:
-    optimizes on train, validates on test, penalizes train/test gap.
+    Args:
+        trial: Optuna trial.
+        tickers: Stock universe.
+        config_path: Base YAML config to load.
+        suggest_params: Callable that takes a trial and returns a dict of
+            config overrides. Keys should be dot-separated paths like
+            "factors.weights", "factors.sigmoid_weight",
+            "backtest.long_threshold", etc.
+        train_period: If provided with test_period, runs walk-forward validation.
+        test_period: If provided with train_period, runs walk-forward validation.
     """
-    # --- Sample parameters (8 total) ---
-
-    # Tier 1: Factor weights (5 params)
-    weights = {
-        "graham_pe": trial.suggest_float("w_graham_pe", 0.0, 3.0),
-        "price_to_book": trial.suggest_float("w_price_to_book", 0.0, 3.0),
-        "graham_number": trial.suggest_float("w_graham_number", 0.0, 3.0),
-        "current_ratio": trial.suggest_float("w_current_ratio", 0.0, 3.0),
-        "dividend_yield": trial.suggest_float("w_dividend_yield", 0.0, 3.0),
-    }
-
-    # Tier 2: Signal thresholds (2 params)
-    long_threshold = trial.suggest_float("long_threshold", 0.45, 0.75)
-    sigmoid_weight = trial.suggest_float("sigmoid_weight", 0.1, 0.9)
-
-    # Tier 3: Risk management (1 param)
-    trailing_stop = trial.suggest_float("trailing_stop_pct", 0.10, 0.35)
+    overrides = suggest_params(trial)
 
     def _build_config(start: str, end: str) -> AlphaLabConfig:
         config = AlphaLabConfig.from_yaml(config_path)
-        config.factors.weights = weights
-        config.factors.sigmoid_weight = sigmoid_weight
-        config.backtest.long_threshold = long_threshold
-        config.backtest.trailing_stop_pct = trailing_stop
+        # Apply overrides from strategy search space
+        for key, value in overrides.items():
+            parts = key.split(".")
+            obj = config
+            for part in parts[:-1]:
+                obj = getattr(obj, part)
+            setattr(obj, parts[-1], value)
         config.backtest.start_date = start
         config.backtest.end_date = end
         return config

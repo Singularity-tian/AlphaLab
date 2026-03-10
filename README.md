@@ -61,51 +61,84 @@ cp .env.example .env  # add your FMP_API_KEY
 
 Run a single-stock backtest:
 ```bash
-python examples/quickstart.py --no-llm
+python strategies/graham_value/run.py
+python strategies/graham_value/run.py --ticker MSFT
+```
+
+Run a portfolio backtest:
+```bash
+python strategies/graham_value/portfolio_run.py      # S&P 500 portfolio
+python strategies/expma_kdj/run.py                   # EXPMA+KDJ hourly strategy
 ```
 
 
 ## Project Structure
 
 ```
-alphalab/
-├── factors/              # Factor computation
-│   ├── base.py           # Factor ABC, FactorResult dataclass
-│   ├── registry.py       # @register_factor decorator, factor lookup
-│   ├── graham.py         # 5 Graham value factors (hybrid normalization)
-│   ├── traditional.py    # PE, ROE, FCF Yield (percentile rank)
-│   ├── momentum.py       # 12-1 momentum factor
-│   └── llm_judgment.py   # LLM sentiment on anonymized transcripts
-├── data/
-│   ├── providers.py      # DataProvider: yfinance OHLC + FMP financials
-│   └── cache.py          # File-based cache (Parquet + JSON, TTL expiry)
-├── combiner/
-│   └── equal_weight.py   # Weighted avg → threshold → trading signal
-├── backtest/
-│   ├── runner.py         # BacktestRunner + FactorStrategy (backtesting.py)
-│   └── report.py         # Charts, metrics, factor attribution
-├── anonymizer/
-│   ├── pipeline.py       # 3-layer entity/temporal/product masking
-│   └── verification.py   # Leak detection on anonymized text
-├── llm/
-│   ├── client.py         # Gemini/Claude unified client with retries
-│   └── prompts.py        # Structured prompts for sentiment scoring
-└── config.py             # Pydantic settings (YAML + env vars)
+data/                             # Shared data storage
+  sp500_daily/                    # Daily OHLC + financials
+    download.py                   # Download script (yfinance + FMP)
+    cache/                        # Cached API responses (gitignored)
+  sp500_hourly/                   # Hourly OHLC data
+    download.py                   # Download script (FMP hourly API)
+    cache/                        # Parquet files per ticker (gitignored)
 
-examples/
-├── quickstart.py         # Single-stock backtest entry point
-├── batch_backtest.py     # 100-stock summary scan
-├── batch_detailed.py     # 100-stock with full trade accounting
-└── add_custom_factor.py  # Tutorial: create a custom RSI factor
+alphalab/                         # Shared infrastructure (strategy-agnostic)
+  factors/                        # Factor computation
+    base.py                       # Factor ABC, FactorResult dataclass
+    registry.py                   # @register_factor decorator, factor lookup
+    traditional.py                # PE, ROE, FCF Yield (percentile rank)
+    momentum.py                   # 12-1 momentum factor
+    llm_judgment.py               # LLM sentiment on anonymized transcripts
+    business_resilience.py        # Two-stage LLM business resilience scoring
+  data/
+    providers.py                  # DataProvider: yfinance OHLC + FMP financials
+    cache.py                      # File-based cache (Parquet + JSON, TTL expiry)
+    tickers.py                    # Stock universes (SP500 list)
+  combiner/
+    equal_weight.py               # Weighted avg → threshold → trading signal
+  backtest/
+    runner.py                     # BacktestRunner + FactorStrategy (backtesting.py)
+    portfolio_runner.py           # PortfolioBacktestRunner (multi-stock)
+    report.py                     # Charts, metrics, factor attribution
+    portfolio_report.py           # Portfolio HTML report
+  anonymizer/
+    pipeline.py                   # 3-layer entity/temporal/product masking
+    verification.py               # Leak detection on anonymized text
+  llm/
+    client.py                     # Gemini/Claude unified client with retries
+    prompts.py                    # Structured prompts for sentiment scoring
+  optimizer/                      # Generic hyperparameter optimization (Optuna)
+    runner.py                     # Study orchestration
+    objective.py                  # Backtest reward function
+    apply.py                      # Write best params to YAML
+    report.py                     # Print optimization results
+  config.py                       # Pydantic settings (YAML + env vars)
 
-tests/
-├── conftest.py           # Shared fixtures (mock data, synthetic OHLC)
-├── test_factors.py       # Factor output validation (31 tests)
-├── test_backtest.py      # Combiner + strategy integration tests
-└── test_anonymizer.py    # Anonymization pipeline tests
+strategies/                       # Independent strategy modules
+  graham_value/                   # Benjamin Graham value investing strategy
+    factors.py                    # 5 Graham factors (hybrid sigmoid + percentile)
+    configs/                      # Strategy configs (default.yaml, optimized.yaml)
+    run.py                        # Single-stock backtest entry point
+    portfolio_run.py              # Full S&P 500 portfolio backtest
+    batch_run.py                  # Quick summary on top 100 stocks
+    batch_run_detailed.py         # Detailed trade-level analysis
+    optimize.py                   # Bayesian parameter tuning (owns search space)
+    reports/                      # Generated outputs (gitignored)
+    tests/                        # Strategy-specific tests
+  expma_kdj/                      # EXPMA(12) & KDJ hourly technical strategy
+    strategy.py                   # Core strategy logic
+    run.py                        # Entry point
+    report.py                     # HTML report generator
+    configs/                      # Strategy configs (default.yaml)
+    reports/                      # Backtest output (gitignored)
 
-configs/
-└── default.yaml          # Default backtest/factor/LLM configuration
+tests/                            # Shared infrastructure tests
+  conftest.py                     # Shared fixtures (mock data, synthetic OHLC)
+  test_factors.py                 # Traditional + momentum factor tests
+  test_backtest.py                # Combiner + strategy integration tests
+  test_anonymizer.py              # Anonymization pipeline tests
+  test_business_resilience.py     # Business resilience factor tests
 ```
 
 ## Add Your Own Factor
@@ -127,7 +160,7 @@ class MyFactor(Factor):
         return FactorResult(value=0.7, metadata={"raw": raw})
 ```
 
-See `examples/add_custom_factor.py` for a complete RSI example.
+For generic factors, add them to `alphalab/factors/`. For strategy-specific factor groups, create a new folder under `strategies/` with its own `factors.py`, `configs/`, and `run.py`. Each strategy entry point imports its own factors to trigger registration.
 
 ## Data Sources
 
@@ -150,21 +183,20 @@ See `examples/add_custom_factor.py` for a complete RSI example.
 ### Built
 - [x] Factor framework with registry, normalization, and extensible base classes
 - [x] Graham value strategy (5 factors, hybrid sigmoid + percentile normalization)
+- [x] EXPMA(12) & KDJ hourly technical strategy
 - [x] Traditional factors (PE, ROE, FCF Yield) with expanding-window percentile rank
 - [x] Momentum factor (12-1 price momentum)
 - [x] LLM judgment factor (anonymized earnings transcript sentiment)
+- [x] LLM business resilience factor (two-stage scoring)
 - [x] Anonymization pipeline (entity, temporal, product masking + verification)
 - [x] Data pipeline (yfinance OHLC + FMP 20-year quarterly financials + caching)
-- [x] Backtesting engine (backtesting.py integration, long-only, monthly rebalance)
-- [x] Batch backtesting across 100 stocks with full trade accounting
-- [x] Report generation (charts, metrics, factor attribution)
+- [x] Backtesting engine (single-stock and portfolio, long-only, monthly rebalance)
+- [x] Bayesian hyperparameter optimization (Optuna, walk-forward validation)
+- [x] Report generation (charts, metrics, factor attribution, HTML reports)
 
 ### Planned
 - [ ] **LLM factor formula generation** — LLM proposes novel factor formulas from data patterns
-- [ ] **Factor weight optimization** — learn optimal weights from backtest results
 - [ ] **Reinforcement learning loop** — backtest feedback → factor improvement
-- [ ] **Multi-stock portfolio** — single portfolio across universe (not per-stock)
-- [ ] **Stop-loss / take-profit** — risk management in strategy
 - [ ] **Factor decay monitoring** — detect when factors lose predictive power
 - [ ] **Forward testing** — paper trading with live data
 - [ ] **Live trading integration** — Alpaca / IBKR execution
@@ -174,9 +206,15 @@ See `examples/add_custom_factor.py` for a complete RSI example.
 
 ```bash
 pip install -e ".[dev]"
-pytest                          # 31 tests
-python examples/quickstart.py --no-llm  # single stock
-python examples/batch_detailed.py       # 100 stocks
+pytest tests/ strategies/ -v               # all 43 tests
+python strategies/graham_value/run.py      # single stock backtest
+python strategies/graham_value/optimize.py # Bayesian parameter tuning
+```
+
+Download data for offline use:
+```bash
+python data/sp500_daily/download.py
+python data/sp500_hourly/download.py
 ```
 
 ## License

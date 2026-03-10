@@ -1,6 +1,6 @@
 """Download hourly OHLC data for all S&P 500 tickers from FMP API.
 
-Stores one Parquet file per ticker in the EXPMA12&KDJ/sp500_hourly_data/ folder.
+Stores one Parquet file per ticker in data/sp500_hourly/.
 Supports resume — skips tickers that already have a Parquet file.
 
 FMP API constraints:
@@ -9,8 +9,8 @@ FMP API constraints:
   - Rate limit: 300 requests/minute
 
 Usage:
-    python "EXPMA12&KDJ/download_hourly.py"
-    python "EXPMA12&KDJ/download_hourly.py" --force   # re-download all
+    python data/sp500_hourly/download.py
+    python data/sp500_hourly/download.py --force   # re-download all
 """
 
 from __future__ import annotations
@@ -27,12 +27,12 @@ import pandas as pd
 import requests
 from dotenv import load_dotenv
 
-# Add project root to path for importing SP500 list
+# Ensure project root is on sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from examples.portfolio_backtest import SP500
+from alphalab.data.tickers import SP500
 
 FMP_STABLE_URL = "https://financialmodelingprep.com/stable"
-OUTPUT_DIR = Path(__file__).resolve().parent / "sp500_hourly_data"
+OUTPUT_DIR = Path(__file__).resolve().parent / "cache"
 START_DATE = date(2021, 1, 1)
 END_DATE = date(2026, 3, 9)
 CHUNK_DAYS = 90
