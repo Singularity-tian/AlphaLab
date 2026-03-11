@@ -285,50 +285,51 @@ footer{{margin-top:64px;padding-top:24px;border-top:1px solid var(--bd);text-ali
 <div class="sec">
   <div class="sec-t"><span class="dot"></span>Strategy Details</div>
   <div class="sgrid">
-    <div class="scard"><h3><span class="n">1</span>Factor Scoring</h3>
-      <p>Each stock scored daily by 5 Graham value factors, each in <code>[0,1]</code> where 1.0 = most bullish:</p>
+    <div class="scard"><h3><span class="n">1</span>Multi-Factor Scoring</h3>
+      <p>Each stock scored daily by <b>6 momentum + quality factors</b>, each in <code>[0,1]</code> where 1.0 = most bullish:</p>
       <div style="margin:12px 0">{factor_tags}</div>
       <ul>
-        <li><b>Graham PE</b> — PE &lt; 15 is cheap. sigmoid(PE,15) + percentile rank</li>
-        <li><b>Price-to-Book</b> — P/B &lt; 1.5 is undervalued. sigmoid + percentile</li>
-        <li><b>Graham Number</b> — Price vs sqrt(22.5 x EPS x BVPS). Below = undervalued</li>
-        <li><b>Current Ratio</b> — CR &gt; 2.0 = financially safe. Higher is better</li>
-        <li><b>Dividend Yield</b> — DY &gt; 3% signals cheap stock. Higher is better</li>
+        <li><b>vol_adj_momentum</b> (wt 5.0) — Rolling Sharpe-like momentum: daily returns / volatility × √252. Rewards steady uptrends over volatile spikes</li>
+        <li><b>momentum_6m</b> (wt 3.0) — 6-month price return (126 days, skip 10). Medium-term trend signal</li>
+        <li><b>momentum_3m</b> (wt 2.5) — 3-month price return (63 days, skip 5). Short-term confirmation</li>
+        <li><b>price_acceleration</b> (wt 3.0) — Recent 3m return minus prior 3m return. Detects accelerating trends</li>
+        <li><b>earnings_growth</b> (wt 3.0) — YoY EPS growth rate via sigmoid. Fundamental backing for momentum</li>
+        <li><b>roe</b> (wt 2.0) — Return on equity, expanding-window percentile. Quality filter to avoid junk rallies</li>
       </ul>
-      <p style="margin-top:12px">Formula: <code>score = 0.4 x sigmoid(raw, threshold) + 0.6 x percentile_rank</code></p>
+      <p style="margin-top:12px">Normalization: <code>score = 0.2 × sigmoid + 0.8 × percentile_rank</code></p>
     </div>
     <div class="scard"><h3><span class="n">2</span>Signal-Weighted Sizing</h3>
-      <p>5 factor scores combined via <b>equal-weight average</b> → combined score [0,1].</p>
-      <p>Combined score &gt; <code>0.6</code> → buy signal with strength = <code>(score - 0.6) / 0.4</code></p>
-      <p style="margin-top:12px"><b>Position weight</b> proportional to signal strength:</p>
+      <p>6 factor scores combined via <b>weighted average</b> → combined score [0,1].</p>
+      <p>Combined score &gt; <code>0.52</code> → buy signal with strength proportional to excess score</p>
+      <p style="margin-top:12px"><b>Concentrated portfolio</b>: max <code>{max_pos}</code> positions, max <code>{max_wt}</code> per stock.</p>
       <ul>
-        <li>Score 0.6 → minimal weight (0.05 floor)</li>
-        <li>Score 0.8 → medium weight</li>
-        <li>Score 1.0 → maximum weight</li>
+        <li>Higher signal = larger allocation (signal-weighted sizing)</li>
+        <li>Top candidates by signal strength get priority for available slots</li>
+        <li>2% cash reserve maintained</li>
       </ul>
-      <p style="margin-top:12px">Max <code>{max_wt}</code> per stock, max <code>{max_pos}</code> positions. 5% cash reserve.</p>
+      <p style="margin-top:12px"><b>Key insight</b>: concentration amplifies alpha — 5 high-conviction picks outperform 20 diluted ones.</p>
     </div>
     <div class="scard"><h3><span class="n">3</span>Entry Rules</h3>
-      <p>Signal checked <b>every trading day</b> (not monthly):</p>
+      <p>Signal checked <b>every trading day</b>:</p>
       <ul>
-        <li>New stock crosses combined &gt; 0.6 → buy that day</li>
-        <li><b>Scale-in</b>: buy 50% of target on Day 1</li>
-        <li>If signal still &gt; 0.6 after 5 days → buy remaining 50%</li>
-        <li>If signal drops before scale-in → stay at 50%, mark scaled-in</li>
-        <li>Stocks ranked by signal strength; top candidates get priority</li>
+        <li>Stock's combined score crosses &gt; 0.52 → buy that day</li>
+        <li><b>No scale-in</b>: full position entered immediately for speed</li>
+        <li>Stocks ranked by signal strength; top candidates fill available slots</li>
+        <li>Momentum factors dominate (70% weight) — rides winners aggressively</li>
+        <li>Quality factors (30% weight) — filters out low-quality momentum traps</li>
       </ul>
       <p style="margin-top:12px">Commission: <code>{config_summary.get('commission','0.1%')}</code> per trade.</p>
     </div>
     <div class="scard"><h3><span class="n">4</span>Exit Rules</h3>
       <p>Two exit triggers, checked <b>daily</b>:</p>
       <ul>
-        <li><b>Fixed holding period</b>: auto-sell after <code>{holding_days}</code> trading days (~1 year)</li>
+        <li><b>Fixed holding period</b>: auto-sell after <code>{holding_days}</code> trading days (~2 months), then re-rank and re-enter best signals</li>
         <li><b>Trailing stop-loss</b>: sell if price drops <code>{trailing_stop_pct}</code> from peak since entry</li>
-        <li><b>No cooldown</b>: after stop-loss, can re-buy immediately if signal still good</li>
-        <li>Re-buy resets holding period and trailing high to new entry price</li>
-        <li>On expiry: if signal still &gt; 0.6, can re-enter same day</li>
+        <li><b>No cooldown</b>: after stop or expiry, can re-buy immediately if signal still strong</li>
+        <li>Quarterly rotation captures momentum cycles while limiting single-stock risk</li>
+        <li>Stop-loss preserves capital for redeployment into stronger names</li>
       </ul>
-      <p style="margin-top:12px"><b>No signal-based exit</b>: if signal drops below 0.6 mid-holding, position is kept until expiry or stop-loss.</p>
+      <p style="margin-top:12px"><b>Philosophy</b>: short holding period forces constant re-evaluation — only the strongest momentum names survive each cycle.</p>
     </div>
   </div>
 </div>

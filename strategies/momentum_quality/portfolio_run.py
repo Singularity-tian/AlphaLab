@@ -1,7 +1,7 @@
-"""Portfolio backtest: single $100k account across S&P 500 stocks.
+"""Portfolio backtest: Momentum+Quality strategy on S&P 500.
 
 Usage:
-    python strategies/graham_value/portfolio_run.py
+    python strategies/momentum_quality/portfolio_run.py
 """
 
 from __future__ import annotations
@@ -22,19 +22,18 @@ from alphalab.backtest.portfolio_report import generate_html_report
 
 from alphalab.data.tickers import SP500
 
-import strategies.graham_value.factors  # noqa: F401  — register Graham factors
-from alphalab.factors import momentum, traditional, enhanced  # noqa: F401  — register enhanced factors
+import strategies.momentum_quality.factors  # noqa: F401  — register all factors
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
 
 def main():
-    config = AlphaLabConfig.from_yaml("strategies/graham_value/configs/optimized.yaml")
+    config = AlphaLabConfig.from_yaml("strategies/momentum_quality/configs/optimized.yaml")
     runner = PortfolioBacktestRunner(config)
 
     print("=" * 80)
-    print("  PORTFOLIO BACKTEST — Graham Value Strategy (Dynamic Signals)")
+    print("  PORTFOLIO BACKTEST — Momentum+Quality Strategy")
     print(f"  Initial Capital: ${config.backtest.initial_cash:,.0f}")
     print(f"  Universe: {len(SP500)} stocks")
     print(f"  Period: {config.backtest.start_date} to {config.backtest.end_date}")
@@ -42,7 +41,7 @@ def main():
     print(f"  Holding Period: {config.backtest.holding_period_days} days")
     print(f"  Max Positions: {config.backtest.max_positions}")
     print(f"  Signal Weighted: {config.backtest.signal_weighted}")
-    print(f"  Scale-in: {config.backtest.scale_in} ({config.backtest.scale_in_pct*100:.0f}% initial)")
+    print(f"  Factors: {', '.join(config.factors.factors)}")
     print("=" * 80)
     print()
 
@@ -110,11 +109,10 @@ def main():
 
     print("=" * 80)
 
-    # Save outputs into a timestamped subfolder
+    # Save outputs
     from datetime import datetime
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    method = "graham"
-    run_dir = Path(__file__).parent / "reports" / f"{method}_{ts}"
+    run_dir = Path(__file__).parent / "reports" / f"mq_{ts}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
     equity_curve.to_csv(run_dir / "portfolio_equity_curve.csv", header=True)
@@ -123,7 +121,6 @@ def main():
     if not per_stock_pnl.empty:
         per_stock_pnl.to_csv(run_dir / "portfolio_per_stock_pnl.csv", index=False)
 
-    # Generate HTML report
     config_summary = {
         "initial_cash": f"{config.backtest.initial_cash:,.0f}",
         "period": f"{config.backtest.start_date} to {config.backtest.end_date}",
@@ -138,6 +135,7 @@ def main():
     html_path = generate_html_report(
         result, config_summary,
         output_path=run_dir / "portfolio_report.html",
+        method="momentum_quality",
     )
 
     print(f"\n  Files saved to {run_dir}/:")

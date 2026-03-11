@@ -17,7 +17,9 @@ build/
 
 # Data caches
 data/sp500_daily/cache/
+data/sp500_daily/fmp_cache/
 data/sp500_hourly/cache/
+data/fmp_daily/cache/
 
 # Strategy outputs
 strategies/*/reports/

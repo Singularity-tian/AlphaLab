@@ -28,6 +28,14 @@ class DataProvider:
             ttl_hours=config.data.cache_ttl_hours,
         )
         self._yf_cache: dict[str, yf.Ticker] = {}
+        self._fmp_daily = None
+        if config.data.ohlc_source == "fmp":
+            from alphalab.data.fmp_daily import FMPDailyProvider
+            self._fmp_daily = FMPDailyProvider(
+                api_key=config.data.fmp_api_key,
+                cache_dir=str(config.data.cache_dir).replace("cache", "fmp_cache"),
+                cache_ttl_hours=config.data.cache_ttl_hours,
+            )
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -57,12 +65,16 @@ class DataProvider:
     def get_ohlc(self, ticker: str) -> pd.DataFrame:
         """Get daily OHLC data formatted for backtesting.py.
 
-        Returns DataFrame with columns: Open, High, Low, Close, Volume
+        Returns DataFrame with columns: Open, High, Low, Close, Volume (+ VWAP if FMP)
         and a DatetimeIndex.
 
-        Downloads full history (from 2015-01-01) and caches it date-independently,
+        Downloads full history and caches it date-independently,
         then slices to the requested backtest date range.
         """
+        # Route to FMP if configured
+        if self._fmp_daily is not None:
+            return self._get_ohlc_fmp(ticker)
+
         # Date-independent cache: download full history once per ticker
         full_cache_key = f"ohlc_full_{ticker}"
         full_df = self.cache.get_df(full_cache_key)
@@ -103,6 +115,18 @@ class DataProvider:
             raise ValueError(f"No OHLC data for {ticker} in range {start} to {end}")
 
         return sliced
+
+    def _get_ohlc_fmp(self, ticker: str) -> pd.DataFrame:
+        """Get daily OHLC via FMP. Includes VWAP column."""
+        start = self.config.backtest.start_date
+        end = self.config.backtest.end_date
+        try:
+            df = self._fmp_daily.get_ohlc(ticker, start=start, end=end)
+            logger.info("FMP OHLC %s: %d rows (%s to %s)", ticker, len(df),
+                        df.index[0].date(), df.index[-1].date())
+            return df
+        except Exception as e:
+            raise ValueError(f"No FMP OHLC data for {ticker} in range {start} to {end}") from e
 
     # ------------------------------------------------------------------
     # Financial ratios (FMP stable API — 80 quarters)

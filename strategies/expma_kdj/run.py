@@ -25,7 +25,7 @@ STRATEGY_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = STRATEGY_DIR.parent.parent
 DATA_DIR = PROJECT_ROOT / "data" / "sp500_hourly" / "cache"
 REPORTS_DIR = STRATEGY_DIR / "reports"
-CONFIG_PATH = STRATEGY_DIR / "configs" / "default.yaml"
+CONFIG_PATH = STRATEGY_DIR / "configs" / "optimized.yaml"
 
 
 def load_config() -> dict:

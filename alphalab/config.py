@@ -16,6 +16,7 @@ class DataConfig(BaseSettings):
     fmp_api_key: str = Field(default="", alias="FMP_API_KEY")
     cache_dir: Path = Path("data/sp500_daily/cache")
     cache_ttl_hours: int = 24
+    ohlc_source: Literal["yahoo", "fmp"] = "yahoo"  # daily OHLC source
 
 
 class BacktestConfig(BaseSettings):
